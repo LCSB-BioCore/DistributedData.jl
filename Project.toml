@@ -1,0 +1,4 @@
+name = "DiDa"
+uuid = "562f8d76-d205-4967-b33e-8d07f0059ed7"
+authors = ["Mirek Kratochvil <exa.exa@gmail.com>"]
+version = "0.1.0"
