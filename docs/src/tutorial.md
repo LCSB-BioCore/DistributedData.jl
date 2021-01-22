@@ -247,7 +247,130 @@ julia> gather_array(dataset2)
 
 ## Transformations and reductions
 
+There are several simplified functions to run parallel transformations of the
+data and reductions:
+
+- [`dtransform`](@ref) that processes all parts of dataset using a given
+  function and stores the result
+- [`dexec`](@ref) that is similar to `dtransform` but used to execute a
+  function that works with the data using "side-effects" for increased
+  efficiency, such as in case of the small array-modifying operations.
+- [`dmapreduce`](@ref) that applies (maps) a function to all data parts and
+  reduces (or folds) the results to one using another function
+- [`dmap`](@ref) that executes a function over the distributed data parts,
+  distributing a vector of values as parameters for that function.
+
+For example, `dtransform` can be used to exponentiate the whole dataset:
+```julia
+julia> dataset = scatter_array(:myData, randn(1000,3), workers())
+julia> get_val_from(dataset.workers[1], :(myData[1,:]))
+3-element Array{Float64,1}:
+ -1.0788051465727018
+ -0.29710863020942757
+ -2.5613834309426546
+
+julia> dtransform(dataset, x -> 2 .^ x)
+Dinfo(:myData, [2, 3, 4])
+
+julia> get_val_from(dataset.workers[1], :(myData[1,:]))
+3-element Array{Float64,1}:
+ 0.4734207525033287
+ 0.8138819001228813
+ 0.16941300928000705
+```
+
+You may have noticed that `dtransform` returns a new `Dinfo` object. That is
+safe to ignore, but you can use `dtransform` to put the result into another
+distributed variable with the extra argument, in which case the returned
+`Dinfo` wraps this new distributed variable. That is very useful for easily
+creating new datasets with the same command on all workers. In the following
+example, also note that the function does not need to be quoted.
+
+```julia
+julia> anotherDataset = dtransform((), _ ->randn(100), workers(), :newData)
+Dinfo(:newData, [2, 3, 4])
+```
+
+The `dexec` function is handy if your transformation does not modify the whole
+array, but leaves most of it untouched and rewriting it would be a waste of
+resources. This multiplies the 5-th element of each distributed array by 42:
+
+```julia
+julia> dexec(anotherDataset, arr -> arr[5] *= 42)
+julia> gather_array(anotherDataset)[1:6]
+6-element Array{Float64,1}:
+  0.8270400003123709
+ -0.10688512653581493
+ -1.0462015551052068
+ -1.2891453384843214
+ 16.429315504503112
+  0.13958421716454797
+  ⋮
+```
+
+MapReduce is a handy primitive that is suitable for operations that can
+compress the dataset slices into relatively small values that can be combined
+efficiently. For example, this computes the sum of squares of the whole array:
+
+```julia
+julia> dmapreduce(anotherDataset, x -> sum(x.^2), +)
+8633.94032741762
+```
+
+Finally, `dmap` is useful for passing each worker a specific value from the
+given vector, which may be useful in cases when each worker is supposed to do
+something different with the data, such as submitting them to a different
+interface or saving them as a different file. The results are returned as a
+vector. This example is rather simplistic:
+
+```julia
+julia> dmap(Vector(1:length(workers())),
+                   val -> "Worker number $(val) has ID $(myid())",
+		   workers())
+3-element Array{String,1}:
+ "Worker number 1 has ID 2"
+ "Worker number 2 has ID 3"
+ "Worker number 3 has ID 4"
+```
+
 ## Persisting the data
+
+There some support for storing the loaded dataset on each worker's local
+storage. This is quite beneficial for storing sub-results and various artifacts
+for future use without wasting memory.
+
+The available functions are:
+- [`dstore`](@ref), which saves the dataset to a disk, such as in
+```julia
+julia> dstore(anotherDataset)
+```
+  ...which, in this case, creates files `newData-1.slice` to `newData-3.slice`
+  that contain the respective parts of the dataset. The name can be modified
+  using the `files` parameter.
+- [`dload`](@ref), which loads the data back, using the same arguments as `dstore`
+- [`dunlink`](@ref), which removes the corresponding files.
+
+One possible use-case for this is a relatively easy way of data exchange
+between nodes in a HPC environment, where the disk storage is usually a very
+fast "scratch space" that is shared among all participants of a computation.
 
 ## Miscellaneous functions
 
+There are many extra functions that work on matrix data, as common in many
+science areas (especially in flow cytometry data processing, where DiDa
+originated):
+
+- [`dselect`](@ref) reduces a matrix to several selected columns
+- [`dapply_cols`](@ref) transforms selected columns with a function
+- [`dapply_rows`](@ref) does the same with rows
+- [`dstat`](@ref) quickly computes mean and standard deviation in selected
+  columns (as shown above)
+- [`dstat_buckets`](@ref) does the same for multiple data "groups" present in
+  the same matrix; the data groups are specified by an integer vector (this is
+  great e.g. for computing per-cluster statistics, given the integer vector
+  assigns data entries to clusters)
+- [`dcount`](@ref) counts ocurrences of items in an integer vector, similar to e.g. R function `tabulate`
+- [`dcount_buckets`](@ref) does the same per groups
+- [`dscale`](@ref) scales the selected columns to mean 0 and standard deviation 1
+- [`dmedian`](@ref) computes a median in columns of the dataset (That is done by an approximative algorithm that works in time `O(n*iters)`, thus works even for really large datasets. Precision increases by roughly 1 bit per iteration, the default is 20 iterations.)
+- [`dmedian_buckets`](@ref) computes the medians using the above method for multiple data groups
