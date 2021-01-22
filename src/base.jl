@@ -30,8 +30,8 @@ The symbols are saved in Main module on the corresponding worker. For example,
 `save_at(1, :x, nothing)` _will_ erase your local `x` variable. Beware of name
 collisions.
 """
-function save_at(worker, sym::Symbol, val)
-    remotecall(() -> Base.eval(Main, :(
+function save_at(worker, sym::Symbol, val; mod=Main)
+    remotecall(() -> Base.eval(mod, :(
         begin
             $sym = $val
             nothing
@@ -45,8 +45,8 @@ end
 Get a value `val` from a remote `worker`; quoting of `val` works just as with
 `save_at`. Returns a future with the requested value.
 """
-function get_from(worker, val)
-    remotecall(() -> Base.eval(Main, :($val)), worker)
+function get_from(worker, val; mod=Main)
+    remotecall(() -> Base.eval(mod, :($val)), worker)
 end
 
 """
@@ -68,14 +68,14 @@ function remove_from(worker, sym::Symbol)
 end
 
 """
-    distribute_array(sym, x::Array, pids; dim=1)::Dinfo
+    scatter_array(sym, x::Array, pids; dim=1)::Dinfo
 
 Distribute roughly equal parts of array `x` separated on dimension `dim` among
 `pids` into a worker-local variable `sym`.
 
 Returns the `Dinfo` structure for the distributed data.
 """
-function distribute_array(sym::Symbol, x::Array, pids; dim = 1)::Dinfo
+function scatter_array(sym::Symbol, x::Array, pids; dim = 1)::Dinfo
     n = length(pids)
     dims = size(x)
 
@@ -93,33 +93,33 @@ function distribute_array(sym::Symbol, x::Array, pids; dim = 1)::Dinfo
 end
 
 """
-    undistribute(sym, workers)
+    unscatter(sym, workers)
 
 Remove the loaded data from workers.
 """
-function undistribute(sym::Symbol, workers)
+function unscatter(sym::Symbol, workers)
     for f in [remove_from(pid, sym) for pid in workers]
         fetch(f)
     end
 end
 
 """
-    undistribute(dInfo::Dinfo)
+    unscatter(dInfo::Dinfo)
 
 Remove the loaded data described by `dInfo` from the corresponding workers.
 """
-function undistribute(dInfo::Dinfo)
-    undistribute(dInfo.val, dInfo.workers)
+function unscatter(dInfo::Dinfo)
+    unscatter(dInfo.val, dInfo.workers)
 end
 
 """
-    distributed_exec(val, fn, workers)
+    dexec(val, fn, workers)
 
 Execute a function on workers, taking `val` as a parameter. Results are not
 collected. This is optimal for various side-effect-causing computations that
-are not expressible with `distributed_transform`.
+are not easily expressible with `dtransform`.
 """
-function distributed_exec(val, fn, workers)
+function dexec(val, fn, workers)
     for f in [get_from(pid, :(
         begin
             $fn($val)
@@ -131,16 +131,16 @@ function distributed_exec(val, fn, workers)
 end
 
 """
-    distributed_exec(dInfo::Dinfo, fn)
+    dexec(dInfo::Dinfo, fn)
 
-Variant of `distributed_exec` that works with `Dinfo`.
+Variant of `dexec` that works with `Dinfo`.
 """
-function distributed_exec(dInfo::Dinfo, fn)
-    distributed_exec(dInfo.val, fn, dInfo.workers)
+function dexec(dInfo::Dinfo, fn)
+    dexec(dInfo.val, fn, dInfo.workers)
 end
 
 """
-    distributed_transform(val, fn, workers, tgt::Symbol=val)
+    dtransform(val, fn, workers, tgt::Symbol=val)
 
 Transform the worker-local distributed data available as `val` on `workers`
 in-place, by a function `fn`. Store the result as `tgt` (default `val`)
@@ -148,9 +148,9 @@ in-place, by a function `fn`. Store the result as `tgt` (default `val`)
 # Example
     
     # multiply all saved data by 2
-    distributed_transform(:myData, (d)->(2*d), workers())
+    dtransform(:myData, (d)->(2*d), workers())
 """
-function distributed_transform(val, fn, workers, tgt::Symbol = val)::Dinfo
+function dtransform(val, fn, workers, tgt::Symbol = val)::Dinfo
     for f in [save_at(pid, tgt, :($fn($val))) for pid in workers]
         fetch(f)
     end
@@ -158,20 +158,20 @@ function distributed_transform(val, fn, workers, tgt::Symbol = val)::Dinfo
 end
 
 """
-    distributed_transform(dInfo::Dinfo, fn, tgt::Symbol=dInfo.val)::Dinfo
+    dtransform(dInfo::Dinfo, fn, tgt::Symbol=dInfo.val)::Dinfo
 
-Same as `distributed_transform`, but specialized for `Dinfo`.
+Same as `dtransform`, but specialized for `Dinfo`.
 """
-function distributed_transform(
+function dtransform(
     dInfo::Dinfo,
     fn,
     tgt::Symbol = dInfo.val,
 )::Dinfo
-    distributed_transform(dInfo.val, fn, dInfo.workers, tgt)
+    dtransform(dInfo.val, fn, dInfo.workers, tgt)
 end
 
 """
-    distributed_mapreduce(val, map, fold, workers)
+    dmapreduce(val, map, fold, workers)
 
 Run `map`s (non-modifying transforms on the data) and `fold`s (2-to-1
 reductions) on the worker-local data (in `val`s) distributed on `workers` and
@@ -186,7 +186,7 @@ main process.
 
 # Example
     # compute the mean of all distributed data
-    sum,len = distributed_mapreduce(:myData,
+    sum,len = dmapreduce(:myData,
         (d) -> (sum(d),length(d)),
         ((s1, l1), (s2, l2)) -> (s1+s2, l1+l2),
         workers())
@@ -198,12 +198,12 @@ The `val` here does not necessarily need to refer to a symbol, you can easily
 pass in a quoted tuple, which will be unquoted in the function parameter. For
 example, distributed values `:a` and `:b` can be joined as such:
 
-    distributed_mapreduce(:((a,b)),
+    dmapreduce(:((a,b)),
         ((a,b)::Tuple) -> [a b],
         vcat,
         workers())
 """
-function distributed_mapreduce(val, map, fold, workers)
+function dmapreduce(val, map, fold, workers)
     if isempty(workers)
         return nothing
     end
@@ -223,33 +223,33 @@ function distributed_mapreduce(val, map, fold, workers)
 end
 
 """
-    distributed_mapreduce(dInfo::Dinfo, map, fold)
+    dmapreduce(dInfo::Dinfo, map, fold)
 
-Distributed map/reduce (just as the other overload of `distributed_mapreduce`)
+Distributed map/reduce (just as the other overload of `dmapreduce`)
 that works with `Dinfo`.
 """
-function distributed_mapreduce(dInfo::Dinfo, map, fold)
-    distributed_mapreduce(dInfo.val, map, fold, dInfo.workers)
+function dmapreduce(dInfo::Dinfo, map, fold)
+    dmapreduce(dInfo.val, map, fold, dInfo.workers)
 end
 
 """
-    distributed_mapreduce(vals::Vector, map, fold, workers)
+    dmapreduce(vals::Vector, map, fold, workers)
 
-Variant of `distributed_mapreduce` that works with more distributed variables
+Variant of `dmapreduce` that works with more distributed variables
 at once.
 """
-function distributed_mapreduce(vals::Vector, map, fold, workers)
-    return distributed_mapreduce(Expr(:vect, vals...), vals -> map(vals...), fold, workers)
+function dmapreduce(vals::Vector, map, fold, workers)
+    return dmapreduce(Expr(:vect, vals...), vals -> map(vals...), fold, workers)
 end
 
 """
-    distributed_mapreduce(dInfo1::Dinfo, dInfo2::Dinfo, map, fold)
+    dmapreduce(dInfo1::Dinfo, dInfo2::Dinfo, map, fold)
 
-Variant of `distributed_mapreduce` that works with more `Dinfo`s at
+Variant of `dmapreduce` that works with more `Dinfo`s at
 once.  The data must be distributed on the same set of workers, in the same
 order.
 """
-function distributed_mapreduce(dInfos::Vector{Dinfo}, map, fold)
+function dmapreduce(dInfos::Vector{Dinfo}, map, fold)
     if (isempty(dInfos))
         return nothing
     end
@@ -259,11 +259,11 @@ function distributed_mapreduce(dInfos::Vector{Dinfo}, map, fold)
         error("data distribution mismatch")
     end
 
-    return distributed_mapreduce([di.val for di in dInfos], map, fold, dInfos[1].workers)
+    return dmapreduce([di.val for di in dInfos], map, fold, dInfos[1].workers)
 end
 
 """
-    distributed_collect(val::Symbol, workers, dim=1; free=false)
+    gather_array(val::Symbol, workers, dim=1; free=false)
 
 Collect the arrays distributed on `workers` under value `val` into an array. The
 individual arrays are pasted in the dimension specified by `dim`, i.e. `dim=1`
@@ -271,15 +271,15 @@ is roughly equivalent to using `vcat`, and `dim=2` to `hcat`.
 
 `val` must be an Array-based type; the function will otherwise fail.
 
-If `free` is true, the `val` is undistributed after collection.
+If `free` is true, the `val` is `unscatter`ed after being gathered.
 
 This preallocates the array for results, and is thus more efficient than e.g.
-using `distributed_mapreduce` with `vcat` for folding.
+using `dmapreduce` with `vcat` for folding.
 """
-function distributed_collect(val::Symbol, workers, dim = 1; free = false)
+function gather_array(val::Symbol, workers, dim = 1; free = false)
     size0 = get_val_from(workers[1], :(size($val)))
     innerType = get_val_from(workers[1], :(typeof($val).parameters[1]))
-    sizes = distributed_mapreduce(val, d -> size(d, dim), vcat, workers)
+    sizes = dmapreduce(val, d -> size(d, dim), vcat, workers)
     ressize = [size0[i] for i = 1:length(size0)]
     ressize[dim] = sum(sizes)
     result = zeros(innerType, ressize...)
@@ -291,50 +291,50 @@ function distributed_collect(val::Symbol, workers, dim = 1; free = false)
         off += sizes[i]
     end
     if free
-        undistribute(val, workers)
+        unscatter(val, workers)
     end
     return result
 end
 
 """
-    distributed_collect(dInfo::Dinfo, dim=1; free=false)
+    gather_array(dInfo::Dinfo, dim=1; free=false)
 
-Distributed collect (just as the other overload) that works with
+Distributed gather_array (just as the other overload) that works with
 `Dinfo`.
 """
-function distributed_collect(dInfo::Dinfo, dim = 1; free = false)
-    return distributed_collect(dInfo.val, dInfo.workers, dim, free = free)
+function gather_array(dInfo::Dinfo, dim = 1; free = false)
+    return gather_array(dInfo.val, dInfo.workers, dim, free = free)
 end
 
 """
-    distributed_foreach(arr::Vector, fn, workers)
+    dmap(arr::Vector, fn, workers)
 
 Call a function `fn` on `workers`, with a single parameter arriving from the
 corresponding position in `arr`.
 """
-function distributed_foreach(arr::Vector, fn, workers)
+function dmap(arr::Vector, fn, workers)
     futures = [
-        remotecall(() -> Base.eval(Main, :($fn($(arr[i])))), pid)
+        remotecall(() -> Base.eval(Main, :($fn($(arr[i])))), pid) #TODO convert to get_from
         for (i, pid) in enumerate(workers)
     ]
     return [fetch(f) for f in futures]
 end
 
 """
-    tmpSym(s::Symbol; prefix="", suffix="_tmp")
+    tmp_symbol(s::Symbol; prefix="", suffix="_tmp")
 
 Decorate a symbol `s` with prefix and suffix, to create a good name for a
 related temporary value.
 """
-function tmpSym(s::Symbol; prefix = "", suffix = "_tmp")
+function tmp_symbol(s::Symbol; prefix = "", suffix = "_tmp")
     return Symbol(prefix * String(s) * suffix)
 end
 
 """
-    tmpSym(dInfo::Dinfo; prefix="", suffix="_tmp")
+    tmp_symbol(dInfo::Dinfo; prefix="", suffix="_tmp")
 
 Decorate the symbol from `dInfo` with prefix and suffix.
 """
-function tmpSym(dInfo::Dinfo; prefix = "", suffix = "_tmp")
-    return tmpSym(dInfo.val, prefix = prefix, suffix = suffix)
+function tmp_symbol(dInfo::Dinfo; prefix = "", suffix = "_tmp")
+    return tmp_symbol(dInfo.val, prefix = prefix, suffix = suffix)
 end

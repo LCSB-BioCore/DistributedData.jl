@@ -5,7 +5,7 @@
 Clone the dataset and store it under a new distributed name `newName`.
 """
 function dcopy(dInfo::Dinfo, newName::Symbol)::Dinfo
-    distributed_transform(dInfo, x -> x, newName)
+    dtransform(dInfo, x -> x, newName)
 end
 
 """
@@ -18,7 +18,7 @@ function dselect(
     columns::Vector{Int},
     tgt::Symbol = dInfo.val,
 )::Dinfo
-    distributed_transform(dInfo, mtx -> mtx[:, columns], tgt)
+    dtransform(dInfo, mtx -> mtx[:, columns], tgt)
 end
 
 """
@@ -57,7 +57,7 @@ function dapply_cols(dInfo::Dinfo, fn, columns::Vector{Int})
         x[:, c] = fn(x[:, c], idx)
     end
 
-    distributed_exec(dInfo, transform_columns)
+    dexec(dInfo, transform_columns)
 end
 
 """
@@ -72,7 +72,7 @@ function dapply_rows(dInfo::Dinfo, fn)
         x[i, :] = fn(x[i, :])
     end
 
-    distributed_exec(dInfo, transform_rows)
+    dexec(dInfo, transform_rows)
 end
 
 """
@@ -107,7 +107,7 @@ function dstat(
         )
 
     # extract the stats
-    (sums, sqsums, ns) = distributed_mapreduce(dInfo, get_stats, combine_stats)
+    (sums, sqsums, ns) = dmapreduce(dInfo, get_stats, combine_stats)
 
     return (
         (sums./ns)[1, :], #means
@@ -137,7 +137,7 @@ function dstat_buckets(
 
     # extract the bucketed stats
     (sums, sqsums, ns) =
-        distributed_mapreduce([dInfo, buckets], get_bucketed_stats, combine_stats)
+        dmapreduce([dInfo, buckets], get_bucketed_stats, combine_stats)
 
     return (
         sums ./ ns, #means
@@ -160,7 +160,7 @@ function dcount(ncats::Int, dInfo::Dinfo)::Vector{Int}
         return counts
     end
 
-    distributed_mapreduce(dInfo, tabulate, +)
+    dmapreduce(dInfo, tabulate, +)
 end
 
 """
@@ -186,7 +186,7 @@ function dcount_buckets(
         return counts
     end
 
-    distributed_mapreduce([dInfo, buckets], tabulate2, +)
+    dmapreduce([dInfo, buckets], tabulate2, +)
 end
 
 """
@@ -203,15 +203,6 @@ function dscale(dInfo::Dinfo, columns::Vector{Int})
     normalize = (coldata, idx) -> (coldata .- mean[idx]) ./ sd[idx]
 
     dapply_cols(dInfo, normalize, columns)
-end
-
-"""
-    dtransform_asinh(dInfo::Dinfo, columns::Vector{Int}, cofactor=5)
-
-Transform columns of the dataset by asinh transformation with `cofactor`.
-"""
-function dtransform_asinh(dInfo::Dinfo, columns::Vector{Int}, cofactor = 5)
-    dapply_cols(dInfo, (v, _) -> asinh.(v ./ cofactor), columns)
 end
 
 """
@@ -275,13 +266,13 @@ end
 
 
 """
-    collect_extrema(ex1, ex2)
+    reduce_extrema(ex1, ex2)
 
-Helper for collecting the minimums and maximums of the data. `ex1`, `ex2` are
+Helper for gathering the minima and maxima of the data. `ex1`, `ex2` are
 arrays of pairs (min,max), this function combines the arrays element-wise and
 finds combined minima and maxima.
 """
-function collect_extrema(ex1, ex2)
+function reduce_extrema(ex1, ex2)
     broadcast(((a, b), (c, d)) -> (min(a, c), max(b, d)), ex1, ex2)
 end
 
@@ -319,13 +310,13 @@ default value is 20, which corresponds to precision 10e-6 times the data range.
 """
 function dmedian(dInfo::Dinfo, columns::Vector{Int}; iters = 20)
     # how many items in the dataset should be smaller than the median (roughly size/2)
-    target = distributed_mapreduce(dInfo, d -> size(d, 1), +) ./ 2
+    target = dmapreduce(dInfo, d -> size(d, 1), +) ./ 2
 
     # current estimation range for the median (tuples of min, max)
-    lims = distributed_mapreduce(
+    lims = dmapreduce(
         dInfo,
         d -> mapslices(extrema, d[:, columns], dims = 1),
-        collect_extrema,
+        reduce_extrema,
     )
 
     # convert the limits to a simple vector
@@ -338,7 +329,7 @@ function dmedian(dInfo::Dinfo, columns::Vector{Int}; iters = 20)
             d -> [count(x -> x < mids[i], d[:, c]) for (i, c) in enumerate(columns)]
 
         # compute the total number of elements smaller than `mids`
-        counts = distributed_mapreduce(dInfo, count_smaller_than_mids, +)
+        counts = dmapreduce(dInfo, count_smaller_than_mids, +)
 
         # update lims into lower/upper half depending on whether the count was
         # lower or higher than target
@@ -364,7 +355,7 @@ function dmedian_buckets(
     # count things in the buckets (produces a matrix with one row per bucket,
     # one column for `columns`)
     targets =
-        distributed_mapreduce(
+        dmapreduce(
             [dInfo, buckets],
             (d, b) -> catmapbuckets((_, x) -> size(x, 1), d[:, columns], nbuckets, b),
             +,
@@ -384,8 +375,8 @@ function dmedian_buckets(
             b,
         )
 
-    # collect the extrema
-    lims = distributed_mapreduce([dInfo, buckets], get_bucket_extrema, collect_extrema)
+    # gather the extrema
+    lims = dmapreduce([dInfo, buckets], get_bucket_extrema, reduce_extrema)
 
     for iter = 1:iters
         mids = sum.(lims) ./ 2
@@ -405,9 +396,9 @@ function dmedian_buckets(
                 slicedims = (1, 2),
             )...)
 
-        # collect the counts
+        # gather the counts
         counts =
-            distributed_mapreduce([dInfo, buckets], bucketed_count_smaller_than_mids, +)
+            dmapreduce([dInfo, buckets], bucketed_count_smaller_than_mids, +)
 
         lims = update_extrema(counts, targets, lims, mids)
     end

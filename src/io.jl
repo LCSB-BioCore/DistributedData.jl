@@ -9,13 +9,13 @@ function defaultFiles(s, pids)
 end
 
 """
-    distributed_export(sym::Symbol, pids, files=defaultFiles(sym,pids))
+    dstore(sym::Symbol, pids, files=defaultFiles(sym,pids))
 
 Export the content of symbol `sym` by each worker specified by `pids` to a
 corresponding filename in `files`.
 """
-function distributed_export(sym::Symbol, pids, files = defaultFiles(sym, pids))
-    distributed_foreach(
+function dstore(sym::Symbol, pids, files = defaultFiles(sym, pids))
+    dmap(
         files,
         (fn) -> Base.eval(Main, :(
             begin
@@ -29,25 +29,25 @@ function distributed_export(sym::Symbol, pids, files = defaultFiles(sym, pids))
 end
 
 """
-    distributed_export(dInfo::Dinfo, files=defaultFiles(dInfo.val, dInfo.workers))
+    dstore(dInfo::Dinfo, files=defaultFiles(dInfo.val, dInfo.workers))
 
 Overloaded functionality for `Dinfo`.
 """
-function distributed_export(
+function dstore(
     dInfo::Dinfo,
     files = defaultFiles(dInfo.val, dInfo.workers),
 )
-    distributed_export(dInfo.val, dInfo.workers, files)
+    dstore(dInfo.val, dInfo.workers, files)
 end
 
 """
-    distributed_import(sym::Symbol, pids, files=defaultFiles(sym,pids))
+    dload(sym::Symbol, pids, files=defaultFiles(sym,pids))
 
 Import the content of symbol `sym` by each worker specified by `pids` from the
 corresponding filename in `files`.
 """
-function distributed_import(sym::Symbol, pids, files = defaultFiles(sym, pids))
-    distributed_foreach(
+function dload(sym::Symbol, pids, files = defaultFiles(sym, pids))
+    dmap(
         files,
         (fn) -> Base.eval(Main, :(
             begin
@@ -61,35 +61,35 @@ function distributed_import(sym::Symbol, pids, files = defaultFiles(sym, pids))
 end
 
 """
-    distributed_import(dInfo::Dinfo, files=defaultFiles(dInfo.val, dInfo.workers))
+    dload(dInfo::Dinfo, files=defaultFiles(dInfo.val, dInfo.workers))
 
 Overloaded functionality for `Dinfo`.
 """
-function distributed_import(
+function dload(
     dInfo::Dinfo,
     files = defaultFiles(dInfo.val, dInfo.workers),
 )
-    distributed_import(dInfo.val, dInfo.workers, files)
+    dload(dInfo.val, dInfo.workers, files)
 end
 
 """
-    distributed_unlink(sym::Symbol, pids, files=defaultFiles(sym,pids))
+    dunlink(sym::Symbol, pids, files=defaultFiles(sym,pids))
 
-Remove the files created by `distributed_export` with the same parameters.
+Remove the files created by `dstore` with the same parameters.
 """
-function distributed_unlink(sym::Symbol, pids, files = defaultFiles(sym, pids))
-    distributed_foreach(files, (fn) -> rm(fn), pids)
+function dunlink(sym::Symbol, pids, files = defaultFiles(sym, pids))
+    dmap(files, (fn) -> rm(fn), pids)
     nothing
 end
 
 """
-    distributed_unlink(dInfo::Dinfo, files=defaultFiles(dInfo.val, dInfo.workers))
+    dunlink(dInfo::Dinfo, files=defaultFiles(dInfo.val, dInfo.workers))
 
 Overloaded functionality for `Dinfo`.
 """
-function distributed_unlink(
+function dunlink(
     dInfo::Dinfo,
     files = defaultFiles(dInfo.val, dInfo.workers),
 )
-    distributed_unlink(dInfo.val, dInfo.workers, files)
+    dunlink(dInfo.val, dInfo.workers, files)
 end
