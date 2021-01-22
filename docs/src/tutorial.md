@@ -369,8 +369,14 @@ originated):
   the same matrix; the data groups are specified by an integer vector (this is
   great e.g. for computing per-cluster statistics, given the integer vector
   assigns data entries to clusters)
-- [`dcount`](@ref) counts ocurrences of items in an integer vector, similar to e.g. R function `tabulate`
+- [`dcount`](@ref) counts ocurrences of items in an integer vector, similar to
+  e.g. R function `tabulate`
 - [`dcount_buckets`](@ref) does the same per groups
-- [`dscale`](@ref) scales the selected columns to mean 0 and standard deviation 1
-- [`dmedian`](@ref) computes a median in columns of the dataset (That is done by an approximative algorithm that works in time `O(n*iters)`, thus works even for really large datasets. Precision increases by roughly 1 bit per iteration, the default is 20 iterations.)
-- [`dmedian_buckets`](@ref) computes the medians using the above method for multiple data groups
+- [`dscale`](@ref) scales the selected columns to mean 0 and standard deviation
+  1
+- [`dmedian`](@ref) computes a median in columns of the dataset (That is done
+  by an approximative algorithm that works in time `O(n*iters)`, thus works
+  even for really large datasets. Precision increases by roughly 1 bit per
+  iteration, the default is 20 iterations.)
+- [`dmedian_buckets`](@ref) computes the medians using the above method for
+  multiple data groups
