@@ -10,7 +10,7 @@
 
         remove_from(1, :test)
 
-        @test sizeof(get_val_from(1, :test)) == 0 #should be "nothing" but this is more generic
+        @test sizeof(get_val_from(1, :test)) == 0 #should be "nothing" but this is more generic and generally describes what we want
     end
 
     addprocs(3)
@@ -26,7 +26,7 @@
         @test [fetch(get_from(w, :test)) for w in W] == data
         @test [get_val_from(w, :test) for w in W] == data
 
-        undistribute(:test, W)
+        unscatter(:test, W)
 
         @test sum([sizeof(get_val_from(w, :test)) for w in W]) == 0
     end
@@ -34,7 +34,7 @@
     @testset "Data distribution" begin
         d = rand(100, 5)
 
-        di = distribute_array(:test, d, W)
+        di = scatter_array(:test, d, W)
 
         @test di.val == :test
         @test Set(di.workers) == Set(W)
@@ -45,30 +45,30 @@
 
         #TODO test actual sizes of the distributed pieces
 
-        @test distributed_collect(di, free = false) == d #TODO test with true
+        @test gather_array(di, free = false) == d #TODO test with true
         @test sum([sizeof(get_val_from(w, :test)) for w in W]) > 0
-        undistribute(di)
+        unscatter(di)
         @test sum([sizeof(get_val_from(w, :test)) for w in W]) == 0
     end
 
     @testset "Distributed computation" begin
-        di = distributed_transform(:(), x -> rand(5), W, :test)
+        di = dtransform(:(), x -> rand(5), W, :test)
 
-        @test get_val_from(W[1], :test) == distributed_collect(di)[1:5]
+        @test get_val_from(W[1], :test) == gather_array(di)[1:5]
 
-        orig = distributed_collect(di)
+        orig = gather_array(di)
 
         @test isapprox(
-            distributed_mapreduce(:test, d -> sum(d .^ 2), (a, b) -> a + b, W),
+            dmapreduce(:test, d -> sum(d .^ 2), (a, b) -> a + b, W),
             sum(orig .^ 2),
         )
 
-        distributed_transform(di, d -> d .* 2)
+        dtransform(di, d -> d .* 2)
 
-        @test orig .* 2 == distributed_collect(:test, W)
+        @test orig .* 2 == gather_array(:test, W)
 
         @test isapprox(
-            distributed_mapreduce(di, d -> sum(d .^ 2), (a, b) -> a + b),
+            dmapreduce(di, d -> sum(d .^ 2), (a, b) -> a + b),
             sum((orig .* 2) .^ 2),
         )
 
@@ -78,41 +78,42 @@
         t[1] = 2
         exp[1] = sum(2 .* get_val_from(W[1], :test))
 
-        @test distributed_foreach(t, (i) -> eval(:(sum($i .* $(di.val)))), W) == exp
+        @test dmap(t, (i) -> eval(:(sum($i .* $(di.val)))), W) == exp
 
-        undistribute(di)
+        unscatter(di)
 
-        @test distributed_mapreduce(:noname, x -> x, (a, b) -> a + b, []) == nothing
+        @test dmapreduce(:noname, x -> x, (a, b) -> a + b, []) == nothing
     end
 
     @testset "Internal utilities" begin
-        @test DiDa.tmpSym(:test) != :test
-        @test DiDa.tmpSym(:test, prefix = "abc", suffix = "def") == :abctestdef
-        @test DiDa.tmpSym(Dinfo(:test, W)) != :test
+        @test DiDa.tmp_symbol(:test) != :test
+        @test DiDa.tmp_symbol(:test, prefix = "abc",
+                                     suffix = "def") == :abctestdef
+        @test DiDa.tmp_symbol(Dinfo(:test, W)) != :test
     end
 
     @testset "Persistent distributed data" begin
-        di = distributed_transform(:(), x -> rand(5), W, :test)
+        di = dtransform(:(), x -> rand(5), W, :test)
 
         files = DiDa.defaultFiles(di.val, di.workers)
         @test allunique(files)
 
-        orig = distributed_collect(di)
-        distributed_export(di, files)
-        distributed_transform(di, x -> "erased")
-        distributed_import(di, files)
+        orig = gather_array(di)
+        dstore(di, files)
+        dtransform(di, x -> "erased")
+        dload(di, files)
 
-        @test orig == distributed_collect(di)
+        @test orig == gather_array(di)
 
-        distributed_export(di.val, di.workers, files)
-        di2 = distributed_import(:test2, di.workers, files)
+        dstore(di.val, di.workers, files)
+        di2 = dload(:test2, di.workers, files)
 
-        @test orig == distributed_collect(di2)
+        @test orig == gather_array(di2)
 
-        undistribute(di)
-        undistribute(di2)
+        unscatter(di)
+        unscatter(di2)
 
-        distributed_unlink(di)
+        dunlink(di)
 
         @test all([!isfile(f) for f in files])
     end
