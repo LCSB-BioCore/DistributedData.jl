@@ -36,8 +36,6 @@ export dcopy,
     dcount_buckets,
     dscale,
     dmedian,
-    dmedian_buckets,
-    mapbuckets,
-    catmapbuckets
+    dmedian_buckets
 
 end # module
