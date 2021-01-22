@@ -1,19 +1,23 @@
 # DiDa.jl
 
-Simple Distributed Data manipulation and processing routines for Julia.
+Simple distributed data manipulation and processing routines for Julia.
 
 This was originally developed for
 [GigaSOM.jl](https://github.com/LCSB-BioCore/GigaSOM.jl), this package contains
 the separated-out lightweight distributed-processing framework that can be used
 with GigaSOM.
 
-## Why and how?
+## Why?
 
 This provides a very simple, imperative and straightforward way to move your
 data around a cluster of Julia processes created by the `Distributed` package,
 and run computation on the distributed data pieces. The main aim of the package
-is to avoid anything complicated, the first version used in GigaSOM had just
+is to avoid anything complicated-- the first version used in GigaSOM had just
 under 500 lines of relatively straightforward code with comments.
+
+Most importantly, distributed processing should be simple and accessible.
+
+## Brief how-to
 
 The package provides a few very basic primitives that lightly wrap the
 `Distributed` package functions `remotecall` and `fetch`. The most basic one is
@@ -30,6 +34,8 @@ julia> addprocs(2)
 2-element Array{Int64,1}:
  2
  3
+
+julia> @everywhere using DiDa
 
 julia> save_at(2, :x, randn(10,10))
 Future(2, 1, 4, nothing)
@@ -111,3 +117,9 @@ julia> gather_array(dataset) # download the data from workers to a sing
  0.610183  1.12165   0.722438
   ⋮
 ```
+
+## What does the name `DiDa` mean?
+
+**Di**stributed **Da**ta.
+
+There is no consensus on how to pronounce the shortcut.
