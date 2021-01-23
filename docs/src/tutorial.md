@@ -54,7 +54,7 @@ UndefValError: x not defined
 
 `DiDa` uses *quoting* to allow you to precisely specify the parts of the code
 that should be evaluated on the "main" Julia process (the one you interact
-with), and the code that shold be evaluated on the remote workers.  Basically,
+with), and the code that should be evaluated on the remote workers.  Basically,
 all quoted code is going to get to the workers without any evaluation; all
 other code is evaluated on the main node.
 
@@ -144,7 +144,7 @@ The simplest way to prevent such data races is to `fetch` the future returned
 from `save_at`, which correctly waits until the result is properly available on
 the target worker.
 
-This *synchronization is not performed by default*, because the non-syncronized
+This *synchronization is not performed by default*, because the non-synchronized
 behavior allows you to very easily implement parallelism. In particular, you
 may start multiple asynchronous computations at once, and then wait for all of
 them to complete to make sure all results are available. Because the operations
@@ -171,7 +171,7 @@ nothing
 …
 ```
 
-The same is applicable for retrieving the sub-results parallelly. This example
+The same is applicable for retrieving the sub-results in parallel. This example
 demonstrates that multiple workers can do some work at the same time:
 
 ```julia
@@ -186,7 +186,7 @@ julia> @time fetch.([get_from(i, :(begin sleep(1); myid(); end))
 
 Notably, you can even send individual `Future`s to other workers, allowing the
 workers to synchronize and transfer the data among each other. This is
-beneficial for implementing advanced parallel algoritms.
+beneficial for implementing advanced parallel algorithms.
 
 ### `Dinfo` handles
 
@@ -198,7 +198,7 @@ functions are able to work with `Dinfo` transparently, instead of the "raw"
 symbols and worker lists.
 
 For example, you can use [`scatter_array`](@ref) to automatically separate the
-array-like dataset to roughly-same pieces scattered accross multiple workers,
+array-like dataset to roughly-same pieces scattered across multiple workers,
 and obtain the `Dinfo` object:
 ```julia
 julia> dataset = scatter_array(:myData, randn(1000,3), workers())
@@ -394,13 +394,13 @@ are applicable in many other areas of data analysis:
   the same matrix, the data groups are specified by a distributed integer
   vector (This is useful e.g. for computing per-cluster statistics, in which
   case the integer vector should assign individual data entries to clusters.)
-- [`dcount`](@ref) counts the numbers of ocurrences of items in an integer
+- [`dcount`](@ref) counts the numbers of occurrences of items in an integer
   vector, similar to e.g. R function `tabulate`
 - [`dcount_buckets`](@ref) does the same per groups
 - [`dscale`](@ref) scales the selected columns to mean 0 and standard deviation
   1
 - [`dmedian`](@ref) computes a median of the selected columns of the dataset
-  (The computation is done using an approximative iterative algorithm in time
+  (The computation is done using an approximate iterative algorithm in time
   `O(n*iters)`, which scales even to really large datasets. The precision of
   the result increases by roughly 1 bit per iteration, the default is 20
   iterations.)
