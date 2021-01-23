@@ -21,21 +21,23 @@ julia> @everywhere using DiDa
 ## Moving the data around
 
 In `DiDa`, the storage of distributed data is done in the "native" Julia way --
-the data is stored in normal named variables. Each node holds its own dataset
-in a custom set of variables, and these are completely independent of each
-other.
+the data is stored in normal named variables. Each node holds its own data in
+an arbitrary set of variables as "plain data"; content of these variables is
+completely independent among nodes.
 
 There are two basic data-moving functions:
 
-- [`save_at`](@ref), which evaluates a given object on the remote worker, and
-  stores it in a variable. `save_at(3, :x, 123)` is roughly the same as if you
-  connected to the Julia session on the worker `3` and typed `x = 123`.
+- [`save_at`](@ref), which evaluates a given expression on the remote worker,
+  and stores it in a variable. In particular, `save_at(3, :x, 123)` is roughly
+  the same as if you would manually connect to the Julia session on the worker
+  `3` and type `x = 123`.
 - [`get_from`](@ref), which evaluates a given object on the remote worker and
   returns a `Future` that holds the evaluated result. To get the value of `x`
-  from worker `3`, you call `fetch(get_from(3, :x))`.
+  from worker `3`, you may call `fetch(get_from(3, :x))` to fetch the
+  "contents" of that future. (Additionally, there is [`get_val_from`](@ref),
+  which calls the `fetch` for you.)
 
-Additionally, there is [`get_val_from`](@ref), which calls the `fetch` right
-away.
+The use of these functions is quite straightforward:
 
 ```julia
 julia> save_at(3,:x,123)
@@ -50,13 +52,14 @@ UndefValError: x not defined
 …
 ```
 
-We use quoting to precisely distinguish what code is evaluated on the "leader"
-worker that you use, and what code is evaluated on the workers. Basically,
-everything quoted is going to get to the workers without any evaluation;
-everything other is evaluated on the main node.
+`DiDa` uses *quoting* to allow you to precisely specify the parts of the code
+that should be evaluated on the "main" Julia process (the one you interact
+with), and the code that shold be evaluated on the remote workers.  Basically,
+all quoted code is going to get to the workers without any evaluation; all
+other code is evaluated on the main node.
 
-For example, this picks up variable `x` from the node, which is named as `y` on
-the main node:
+For example, this picks up the contents of variable `x` from the remote worker,
+despite that actual symbol is named as `y` in the main process:
 ```julia
 julia> y=:x
 :x
@@ -65,33 +68,36 @@ julia> get_val_from(3, y)
 123
 ```
 
-The quoting system can be easily exploited to tell the system that some
-operations (e.g., heavy computations) are going to be executed on the remotes.
+This system is used to easily specify that some particular operations (e.g.,
+heavy computations) are going to be executed on the remotes.
 
-For example, this code generates a huge random matrix locally and sends it to
-the worker, which may not be desired (the data transfer takes precious time):
+To illustrate the difference between quoted and non-quoted code, the following
+code generates a huge random matrix locally and sends it to the worker, which
+may not be desired (the data transfer takes a lot of precious time):
 
 ```julia
 julia> save_at(2, :mtx, randn(1000, 1000))
 ```
 
-On the remote, this may have been executed as something like
+On the remote worker `2`, this will be executed as something like
 `mtx = [0.384478, 0.763806, -0.885208, …]` .
 
 If you quote the parameter, it is not going to be evaluated on the main worker,
 but rather goes unevaluated and "packed" as an expression to the remote, which
-unpacks and evaluates it for itself. The data transfer is thus minimized:
+unpacks and evaluates it by itself:
 
 ```julia
 julia> save_at(2, :mtx, :(randn(1000,1000)))
 ```
 
-On the remote, this is executed properly as `mtx = randn(1000, 1000)`. This is
-useful if handling large data -- you can easily load giant datasets to the
-workers without the risk that all data are loaded at your computer, likely
-causing an out-of-memory trouble.
+The data transfer is minimized to a few-byte expression `randn(1000,1000)`. On
+the remote, this is executed properly as `mtx = randn(1000, 1000)`.
 
-The same applies for receiving the data -- you can let some of the workers
+This is useful for handling large data -- you can easily load giant datasets to
+the workers without hauling all the data through your computer; very likely
+also decreasing the risk of out-of-memory problems.
+
+The same principle applies for receiving the data -- you can let some of the workers
 compute a very hard function and download it as follows:
 
 ```julia
@@ -99,11 +105,11 @@ julia> get_val_from(2, :( computeAnswerToMeaningOfLife() ))
 42
 ```
 
-If the expression in the previous case was not quoted, it would actually lead
-to the main worker computing the answer, sending it to worker `2`, and
-receiving back, which is likely not what we wanted.
+If the expression in the previous case was not quoted, it would actually cause
+the main worker to compute the answer, send it to worker `2`, and receive it
+back unchanged, which is likely not what we wanted.
 
-Finally, it is very easy to work with multiple variables saved at a single
+Finally, this way it is very easy to work with multiple variables saved at a single
 worker -- you just reference them in the expression:
 ```julia
 julia> save_at(2,:x,123)
@@ -114,16 +120,17 @@ julia> get_val_from(2, :(2*x+y))
 
 ### Parallelization and synchronization
 
-Operations executed by `save_at` and `get_from` are asynchronous by default,
-which is good and bad, depending on the purpose. For example, results of
-hard-to-compute functions may not yet be saved at the time you need them. Let's
-demonstrate that on a simulated-hard function:
+Operations executed by `save_at` and `get_from` are *asynchronous* by default,
+which may be both good and bad, depending on the situation. For example, when
+using `save_at`, the results of hard-to-compute functions may not yet be saved
+at the time you need them. Let's demonstrate that on a "simulated" slow
+function:
 
 ```julia
 julia> save_at(2, :delayed, :(begin sleep(30); 42; end))
 Future(2, 1, 18, nothing)
 
-julia> get_val_from(2, :delayed)
+julia> get_val_from(2, :delayed)      # the computation is not finished yet, thus the variable is not assigned
 ERROR: On worker 2:
 UndefVarError: delayed not defined
 
@@ -134,14 +141,17 @@ julia> get_val_from(2, :delayed)
 ```
 
 The simplest way to prevent such data races is to `fetch` the future returned
-from `save_at`, which correctly waits until the result is available.
+from `save_at`, which correctly waits until the result is properly available on
+the target worker.
 
-The synchronization is not performed by default because the non-syncronized
-behavior allows to very easily implement parallelism -- you can start multiple
-computations at once, and then wait for all of them to complete.
+This *synchronization is not performed by default*, because the non-syncronized
+behavior allows you to very easily implement parallelism. In particular, you
+may start multiple asynchronous computations at once, and then wait for all of
+them to complete to make sure all results are available. Because the operations
+run asynchronously, they are processed concurrently, thus faster.
 
-For example, this code distributes the random data and synchronizes correctly,
-but is basically serial:
+To illustrate the difference, the following code distributes some random data
+and then synchronizes correctly, but is essentially serial:
 ```julia
 julia> @time for i in workers()
          fetch(save_at(i, :x, :(randn(10000,10000))))
@@ -161,9 +171,8 @@ nothing
 …
 ```
 
-The same is applicable for retrieving the sub-results parallely. This example
-demonstrates that multiple workers do some work (in this case, wait actively)
-at the same time:
+The same is applicable for retrieving the sub-results parallelly. This example
+demonstrates that multiple workers can do some work at the same time:
 
 ```julia
 julia> @time fetch.([get_from(i, :(begin sleep(1); myid(); end))
@@ -181,12 +190,12 @@ beneficial for implementing advanced parallel algoritms.
 
 ### `Dinfo` handles
 
-Remembering the remote variable names and worker numbers is extremely
-impractical, especially if you manage multiple variables on various subsets of
-all available workers at once. `DiDa` defines a small [`Dinfo`](@ref) data structure
-that manages exactly that information for you. Many other functions are able to
-work with `Dinfo` transparently, instead of the "raw" identifiers and worker
-lists.
+Remembering and managing the remote variable names and worker numbers is
+extremely impractical, especially if you need to maintain multiple variables on
+various subsets of all available workers at once. `DiDa` defines a small
+[`Dinfo`](@ref) data structure that keeps that information for you. Many other
+functions are able to work with `Dinfo` transparently, instead of the "raw"
+symbols and worker lists.
 
 For example, you can use [`scatter_array`](@ref) to automatically separate the
 array-like dataset to roughly-same pieces scattered accross multiple workers,
@@ -196,9 +205,11 @@ julia> dataset = scatter_array(:myData, randn(1000,3), workers())
 Dinfo(:myData, [2, 3, 4])
 ```
 
-You can check the size of the resulting slices on each worker (note the
-`$(...)` syntax for un-quoting, i.e., inserting evaluated data into quoted
-expressions):
+`Dinfo` contains the necessary information about the "contents" of the
+distributed dataset: The name of variable used to save it on workers, and IDs
+of individual workers. The storage of the variables is otherwise same as with
+the basic data-moving function -- you can e.g. manually check the size of the
+resulting slices on each worker using `get_from`:
 ```julia
 julia> fetch.([get_from(w, :(size($(dataset.val)))) for w in dataset.workers])
 3-element Array{Tuple{Int64,Int64},1}:
@@ -206,6 +217,8 @@ julia> fetch.([get_from(w, :(size($(dataset.val)))) for w in dataset.workers])
  (333, 3)
  (334, 3)
 ```
+(Note the `$(...)` syntax for *un-quoting*, i.e., inserting evaluated data into
+quoted expressions.)
 
 The `Dinfo` object is used e.g. by the statistical functions, such as
 [`dstat`](@ref) (see below for more examples). `dstat` just computes means and
@@ -217,13 +230,14 @@ julia> dstat(dataset, [1,2])
  [0.9923669075507301, 0.9768313338000191])          # sdevs
 ```
 
-There are three functions for basic dataset management using the `Dinfo`:
+There are three functions for straightforward data management using the
+`Dinfo`:
 
 - [`dcopy`](@ref) for duplicating the data objects on all related workers
 - [`unscatter`](@ref) for removing the data from workers (and freeing the
   memory)
 - [`gather_array`](@ref) for collecting the array pieces from individual
-  workers and pasting them together (an opposite of `scatter_array`.
+  workers and pasting them together (an opposite of `scatter_array`)
 
 Continuing the previous example, we can copy the data, remove the originals,
 and gather the copies:
@@ -247,18 +261,19 @@ julia> gather_array(dataset2)
 
 ## Transformations and reductions
 
-There are several simplified functions to run parallel transformations of the
-data and reductions:
+There are several simplified functions to run parallel computation on the
+distributed data:
 
-- [`dtransform`](@ref) that processes all parts of dataset using a given
+- [`dtransform`](@ref) processes all worker's parts of the data using a given
   function and stores the result
-- [`dexec`](@ref) that is similar to `dtransform` but used to execute a
-  function that works with the data using "side-effects" for increased
-  efficiency, such as in case of the small array-modifying operations.
-- [`dmapreduce`](@ref) that applies (maps) a function to all data parts and
-  reduces (or folds) the results to one using another function
-- [`dmap`](@ref) that executes a function over the distributed data parts,
-  distributing a vector of values as parameters for that function.
+- [`dmapreduce`](@ref) applies ("maps") a function to all data parts and
+  reduces ("folds") the intermediate results to a single result using another
+  function
+- [`dexec`](@ref) is similar to `dtransform`, but expects a function that
+  modifies the data in-place (using "side-effects"), for increased efficiency
+  in cases such as very small array modifications
+- [`dmap`](@ref) executes a function over the workers, also distributing a
+  vector of values as parameters for that function.
 
 For example, `dtransform` can be used to exponentiate the whole dataset:
 ```julia
@@ -279,21 +294,24 @@ julia> get_val_from(dataset.workers[1], :(myData[1,:]))
  0.16941300928000705
 ```
 
-You may have noticed that `dtransform` returns a new `Dinfo` object. That is
-safe to ignore, but you can use `dtransform` to put the result into another
-distributed variable with the extra argument, in which case the returned
-`Dinfo` wraps this new distributed variable. That is very useful for easily
-creating new datasets with the same command on all workers. In the following
-example, also note that the function does not need to be quoted.
+You may have noticed that `dtransform` returns a new `Dinfo` object, which we
+safely discard in this case. You can use `dtransform` to save the result into
+another distributed variable (by supplying the new name in an extra argument),
+in which case the returned `Dinfo` wraps this new distributed variable. That is
+useful for easily generating new datasets on all workers, as in the following
+example:
 
 ```julia
 julia> anotherDataset = dtransform((), _ ->randn(100), workers(), :newData)
 Dinfo(:newData, [2, 3, 4])
 ```
 
+(Note that the function body does not need to be quoted.)
+
 The `dexec` function is handy if your transformation does not modify the whole
 array, but leaves most of it untouched and rewriting it would be a waste of
-resources. This multiplies the 5-th element of each distributed array by 42:
+resources. This example multiplies the 5th element of each distributed array
+part by 42:
 
 ```julia
 julia> dexec(anotherDataset, arr -> arr[5] *= 42)
@@ -309,19 +327,20 @@ julia> gather_array(anotherDataset)[1:6]
 ```
 
 MapReduce is a handy primitive that is suitable for operations that can
-compress the dataset slices into relatively small values that can be combined
-efficiently. For example, this computes the sum of squares of the whole array:
+"compress" the dataset slices into relatively small pieces of data, which can
+be combined efficiently. For example, this computes the sum of squares of the
+whole array:
 
 ```julia
 julia> dmapreduce(anotherDataset, x -> sum(x.^2), +)
 8633.94032741762
 ```
 
-Finally, `dmap` is useful for passing each worker a specific value from the
-given vector, which may be useful in cases when each worker is supposed to do
-something different with the data, such as submitting them to a different
-interface or saving them as a different file. The results are returned as a
-vector. This example is rather simplistic:
+Finally, `dmap` passes each worker a specific value from a given vector, which
+may be useful in cases when each worker is supposed to do something slightly
+different with the data (for example, submit them to a different interface or
+save them as a different file). The results are returned as a vector. This
+example is rather simplistic:
 
 ```julia
 julia> dmap(Vector(1:length(workers())),
@@ -335,48 +354,55 @@ julia> dmap(Vector(1:length(workers())),
 
 ## Persisting the data
 
-There some support for storing the loaded dataset on each worker's local
-storage. This is quite beneficial for storing sub-results and various artifacts
-for future use without wasting memory.
+`DiDa` provides support for storing the loaded dataset in each worker's local
+storage. This is quite beneficial for saving sub-results and various artifacts
+of the computation process for later use, without unnecessarily wasting
+main memory.
 
-The available functions are:
-- [`dstore`](@ref), which saves the dataset to a disk, such as in
+The available functions are as follows:
+- [`dstore`](@ref) saves the dataset to a disk, such as in
 ```julia
 julia> dstore(anotherDataset)
 ```
   ...which, in this case, creates files `newData-1.slice` to `newData-3.slice`
-  that contain the respective parts of the dataset. The name can be modified
-  using the `files` parameter.
-- [`dload`](@ref), which loads the data back, using the same arguments as `dstore`
-- [`dunlink`](@ref), which removes the corresponding files.
+  that contain the respective parts of the dataset. The precise naming scheme
+  can be specified using the `files` parameter.
+- [`dload`](@ref) loads the data back into memory
+- [`dunlink`](@ref) removes the corresponding files from the storage
 
-One possible use-case for this is a relatively easy way of data exchange
-between nodes in a HPC environment, where the disk storage is usually a very
-fast "scratch space" that is shared among all participants of a computation.
+Apart from saving the data for later use, this provides a relatively easy way
+of exchanging data between nodes in a HPC environment. There, the disk storage
+is usually a very fast "scratch space" that is shared among all participants of
+a computation, and can be used to "broadcast" or "shuffle" the data without any
+significant overhead.
 
 ## Miscellaneous functions
 
-There are many extra functions that work on matrix data, as common in many
-science areas (especially in flow cytometry data processing, where DiDa
-originated):
+For convenience, `DiDa` also contains simple implementations of various common
+utility operations for processing matrix data. These originated in
+flow-cytometry use-cases (which is what `DiDa` was originally built for), but
+are applicable in many other areas of data analysis:
 
-- [`dselect`](@ref) reduces a matrix to several selected columns
-- [`dapply_cols`](@ref) transforms selected columns with a function
+- [`dselect`](@ref) reduces a matrix to several selected columns (in a
+  relatively usual scenario where the rows of the matrix are "events" and
+  columns represent "features", `dselect` discards the unwanted features)
+- [`dapply_cols`](@ref) transforms selected columns with a given function
 - [`dapply_rows`](@ref) does the same with rows
-- [`dstat`](@ref) quickly computes mean and standard deviation in selected
-  columns (as shown above)
+- [`dstat`](@ref) quickly computes the mean and standard deviation in selected
+  columns (as demonstrated above)
 - [`dstat_buckets`](@ref) does the same for multiple data "groups" present in
-  the same matrix; the data groups are specified by an integer vector (this is
-  great e.g. for computing per-cluster statistics, given the integer vector
-  assigns data entries to clusters)
-- [`dcount`](@ref) counts ocurrences of items in an integer vector, similar to
-  e.g. R function `tabulate`
+  the same matrix, the data groups are specified by a distributed integer
+  vector (This is useful e.g. for computing per-cluster statistics, in which
+  case the integer vector should assign individual data entries to clusters.)
+- [`dcount`](@ref) counts the numbers of ocurrences of items in an integer
+  vector, similar to e.g. R function `tabulate`
 - [`dcount_buckets`](@ref) does the same per groups
 - [`dscale`](@ref) scales the selected columns to mean 0 and standard deviation
   1
-- [`dmedian`](@ref) computes a median in columns of the dataset (That is done
-  by an approximative algorithm that works in time `O(n*iters)`, thus works
-  even for really large datasets. Precision increases by roughly 1 bit per
-  iteration, the default is 20 iterations.)
-- [`dmedian_buckets`](@ref) computes the medians using the above method for
+- [`dmedian`](@ref) computes a median of the selected columns of the dataset
+  (The computation is done using an approximative iterative algorithm in time
+  `O(n*iters)`, which scales even to really large datasets. The precision of
+  the result increases by roughly 1 bit per iteration, the default is 20
+  iterations.)
+- [`dmedian_buckets`](@ref) uses the above method to compute the medians for
   multiple data groups
