@@ -361,17 +361,17 @@ main memory.
 
 The available functions are as follows:
 - [`dstore`](@ref) saves the dataset to a disk, such as in
-```julia
-julia> dstore(anotherDataset)
-```
-  ...which, in this case, creates files `newData-1.slice` to `newData-3.slice`
-  that contain the respective parts of the dataset. The precise naming scheme
-  can be specified using the `files` parameter.
-- [`dload`](@ref) loads the data back into memory
+  `dstore(anotherDataset)`, which, in this case, creates files
+  `newData-1.slice` to `newData-3.slice` that contain the respective parts of
+  the dataset. The precise naming scheme can be specified using the `files`
+  parameter.
+- [`dload`](@ref) loads the data back into memory (again using a `Dinfo`
+  parameter with dataset description to get the dataset name and the list of
+  relevant workers)
 - [`dunlink`](@ref) removes the corresponding files from the storage
 
 Apart from saving the data for later use, this provides a relatively easy way
-of exchanging data between nodes in a HPC environment. There, the disk storage
+to exchange the data among nodes in a HPC environment. There, the disk storage
 is usually a very fast "scratch space" that is shared among all participants of
 a computation, and can be used to "broadcast" or "shuffle" the data without any
 significant overhead.
