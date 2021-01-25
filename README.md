@@ -3,19 +3,29 @@
 Simple distributed data manipulation and processing routines for Julia.
 
 This was originally developed for
-[GigaSOM.jl](https://github.com/LCSB-BioCore/GigaSOM.jl), this package contains
-the separated-out lightweight distributed-processing framework that can be used
-with GigaSOM.
+[`GigaSOM.jl`](https://github.com/LCSB-BioCore/GigaSOM.jl); DiDa.jl package
+contains the separated-out lightweight distributed-processing framework that
+was used in `GigaSOM.jl`.
 
 ## Why?
 
-This provides a very simple, imperative and straightforward way to move your
-data around a cluster of Julia processes created by the `Distributed` package,
+DiDa.jl provides a very simple, imperative and straightforward way to move your
+data around a cluster of Julia processes created by the
+[`Distributed`](https://docs.julialang.org/en/v1/stdlib/Distributed/) package,
 and run computation on the distributed data pieces. The main aim of the package
-is to avoid anything complicated-- the first version used in GigaSOM had just
-under 500 lines of relatively straightforward code with comments.
+is to avoid anything complicated-- the first version used in
+[GigaSOM](https://github.com/LCSB-BioCore/GigaSOM.jl) had just under 500 lines
+of relatively straightforward code (including the doc-comments).
 
-Most importantly, distributed processing should be simple and accessible.
+Compared to plain `Distributed` API, you get more straightforward data
+manipulation primitives, some extra control over the precise place where code
+is executed, and a few high-level functions. These include a distributed
+version of `mapreduce`, simpler work-alike of the
+[DistributedArrays](https://github.com/JuliaParallel/DistributedArrays.jl)
+functionality, and easy-to-use distributed dataset saving and loading.
+
+Most importantly, the main motivation behind the package is that the
+distributed processing should be simple and accessible.
 
 ## Brief how-to
 
