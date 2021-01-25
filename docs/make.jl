@@ -7,9 +7,9 @@ makedocs(modules = [DiDa],
     authors = "The developers of DiDa.jl",
     linkcheck = !("skiplinks" in ARGS),
     pages = [
-        "Home" => "index.md",
+        "Documentation" => "index.md",
         "Tutorial" => "tutorial.md",
-        "Functions" => "functions.md",
+        "Function reference" => "functions.md",
     ],
 )
 
