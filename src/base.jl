@@ -173,9 +173,10 @@ end
 """
     dmapreduce(val, map, fold, workers)
 
-Run `map`s (non-modifying transforms on the data) and `fold`s (2-to-1
-reductions) on the worker-local data (in `val`s) distributed on `workers` and
-return the final reduced result.
+A distributed work-alike of the standard `mapreduce`: Take a function `map` (a
+non-modifying transform on the data) and `fold` (2-to-1 reduction of the
+results of `map`), systematically run them on the data described by `val`
+distributed on `workers`, and return the final reduced result.
 
 It is assumed that the fold operation is associative, but not commutative (as
 in semigroups). If there are no workers, operation returns `nothing` (we don't
