@@ -1,4 +1,5 @@
-# DiDa.jl
+# <img src="docs/src/assets/logo.svg" alt="DiDa.jl logo" height="32px"> DiDa.jl
+
 
 | Build status | Documentation |
 |:---:|:---:|
