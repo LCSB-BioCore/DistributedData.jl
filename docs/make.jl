@@ -17,6 +17,6 @@ deploydocs(
     repo = "github.com/LCSB-BioCore/DiDa.jl.git",
     target = "build",
     branch = "gh-pages",
-    devbranch = "master",
+    devbranch = "develop",
     versions = "stable" => "v^",
 )
