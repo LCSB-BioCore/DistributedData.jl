@@ -1,5 +1,9 @@
 # DiDa.jl
 
+| Build status | Documentation |
+|:---:|:---:|
+| ![CI](https://github.com/LCSB-BioCore/DiDa.jl/workflows/CI/badge.svg?branch=develop) | [![doc](https://img.shields.io/badge/docs-stable-blue)](https://lcsb-biocore.github.io/DiDa.jl/stable/) [![doc](https://img.shields.io/badge/docs-dev-blue)](https://lcsb-biocore.github.io/DiDa.jl/dev/) |
+
 Simple distributed data manipulation and processing routines for Julia.
 
 This was originally developed for
