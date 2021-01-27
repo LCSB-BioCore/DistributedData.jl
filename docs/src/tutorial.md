@@ -1,13 +1,13 @@
 
-# DiDa tutorial
+# DistributedData tutorial
 
-The primary purpose of this tutorial is to get a basic grasp of the main `DiDa`
+The primary purpose of this tutorial is to get a basic grasp of the main `DistributedData`
 functions and methodology.
 
 For starting up, let's create a few distributed workers and import the package:
 
 ```julia
-julia> using Distributed, DiDa
+julia> using Distributed, DistributedData
 
 julia> addprocs(3)
 2-element Array{Int64,1}:
@@ -15,12 +15,12 @@ julia> addprocs(3)
  3
  4
 
-julia> @everywhere using DiDa
+julia> @everywhere using DistributedData
 ```
 
 ## Moving the data around
 
-In `DiDa`, the storage of distributed data is done in the "native" Julia way --
+In `DistributedData`, the storage of distributed data is done in the "native" Julia way --
 the data is stored in normal named variables. Each node holds its own data in
 an arbitrary set of variables as "plain data"; content of these variables is
 completely independent among nodes.
@@ -52,7 +52,7 @@ UndefValError: x not defined
 …
 ```
 
-`DiDa` uses *quoting* to allow you to precisely specify the parts of the code
+`DistributedData` uses *quoting* to allow you to precisely specify the parts of the code
 that should be evaluated on the "main" Julia process (the one you interact
 with), and the code that should be evaluated on the remote workers.  Basically,
 all quoted code is going to get to the workers without any evaluation; all
@@ -192,7 +192,7 @@ beneficial for implementing advanced parallel algorithms.
 
 Remembering and managing the remote variable names and worker numbers is
 extremely impractical, especially if you need to maintain multiple variables on
-various subsets of all available workers at once. `DiDa` defines a small
+various subsets of all available workers at once. `DistributedData` defines a small
 [`Dinfo`](@ref) data structure that keeps that information for you. Many other
 functions are able to work with `Dinfo` transparently, instead of the "raw"
 symbols and worker lists.
@@ -354,7 +354,7 @@ julia> dmap(Vector(1:length(workers())),
 
 ## Persisting the data
 
-`DiDa` provides support for storing the loaded dataset in each worker's local
+`DistributedData` provides support for storing the loaded dataset in each worker's local
 storage. This is quite beneficial for saving sub-results and various artifacts
 of the computation process for later use, without unnecessarily wasting
 main memory.
@@ -378,9 +378,9 @@ significant overhead.
 
 ## Miscellaneous functions
 
-For convenience, `DiDa` also contains simple implementations of various common
+For convenience, `DistributedData` also contains simple implementations of various common
 utility operations for processing matrix data. These originated in
-flow-cytometry use-cases (which is what `DiDa` was originally built for), but
+flow-cytometry use-cases (which is what `DistributedData` was originally built for), but
 are applicable in many other areas of data analysis:
 
 - [`dselect`](@ref) reduces a matrix to several selected columns (in a

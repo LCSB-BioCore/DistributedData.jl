@@ -14,7 +14,7 @@
     end
 
     addprocs(3)
-    @everywhere using DiDa
+    @everywhere using DistributedData
     W = workers()
 
     @testset "Distributed data transfers -- with workers" begin
@@ -86,16 +86,16 @@
     end
 
     @testset "Internal utilities" begin
-        @test DiDa.tmp_symbol(:test) != :test
-        @test DiDa.tmp_symbol(:test, prefix = "abc",
+        @test DistributedData.tmp_symbol(:test) != :test
+        @test DistributedData.tmp_symbol(:test, prefix = "abc",
                                      suffix = "def") == :abctestdef
-        @test DiDa.tmp_symbol(Dinfo(:test, W)) != :test
+        @test DistributedData.tmp_symbol(Dinfo(:test, W)) != :test
     end
 
     @testset "Persistent distributed data" begin
         di = dtransform(:(), x -> rand(5), W, :test)
 
-        files = DiDa.defaultFiles(di.val, di.workers)
+        files = DistributedData.defaultFiles(di.val, di.workers)
         @test allunique(files)
 
         orig = gather_array(di)
