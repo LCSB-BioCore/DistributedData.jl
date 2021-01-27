@@ -2,7 +2,7 @@
 @testset "High-level tools" begin
 
     W = addprocs(2)
-    @everywhere using DiDa
+    @everywhere using DistributedData
 
     Random.seed!(1)
     dd = rand(11111, 5)

@@ -1,4 +1,4 @@
-module DiDa
+module DistributedData
 
 using Distributed
 using Serialization

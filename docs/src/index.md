@@ -1,5 +1,5 @@
 
-# DiDa.jl — simple work with distributed data
+# DistributedData.jl — simple work with distributed data
 
 This packages provides simple Distributed Data manipulation and processing
 routines for Julia.

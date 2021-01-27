@@ -1,20 +1,20 @@
-# <img src="docs/src/assets/logo.svg" alt="DiDa.jl logo" height="32px"> DiDa.jl
+# <img src="docs/src/assets/logo.svg" alt="DistributedData.jl logo" height="32px"> DistributedData.jl
 
 
 | Build status | Documentation |
 |:---:|:---:|
-| ![CI](https://github.com/LCSB-BioCore/DiDa.jl/workflows/CI/badge.svg?branch=develop) | [![doc](https://img.shields.io/badge/docs-stable-blue)](https://lcsb-biocore.github.io/DiDa.jl/stable/) [![doc](https://img.shields.io/badge/docs-dev-blue)](https://lcsb-biocore.github.io/DiDa.jl/dev/) |
+| ![CI](https://github.com/LCSB-BioCore/DistributedData.jl/workflows/CI/badge.svg?branch=develop) | [![doc](https://img.shields.io/badge/docs-stable-blue)](https://lcsb-biocore.github.io/DistributedData.jl/stable/) [![doc](https://img.shields.io/badge/docs-dev-blue)](https://lcsb-biocore.github.io/DistributedData.jl/dev/) |
 
 Simple distributed data manipulation and processing routines for Julia.
 
 This was originally developed for
-[`GigaSOM.jl`](https://github.com/LCSB-BioCore/GigaSOM.jl); DiDa.jl package
+[`GigaSOM.jl`](https://github.com/LCSB-BioCore/GigaSOM.jl); DistributedData.jl package
 contains the separated-out lightweight distributed-processing framework that
 was used in `GigaSOM.jl`.
 
 ## Why?
 
-DiDa.jl provides a very simple, imperative and straightforward way to move your
+DistributedData.jl provides a very simple, imperative and straightforward way to move your
 data around a cluster of Julia processes created by the
 [`Distributed`](https://docs.julialang.org/en/v1/stdlib/Distributed/) package,
 and run computation on the distributed data pieces. The main aim of the package
@@ -43,14 +43,14 @@ same way, but takes the data back from the worker.
 You can thus send some random array to a few distributed workers:
 
 ```julia
-julia> using Distributed, DiDa
+julia> using Distributed, DistributedData
 
 julia> addprocs(2)
 2-element Array{Int64,1}:
  2
  3
 
-julia> @everywhere using DiDa
+julia> @everywhere using DistributedData
 
 julia> save_at(2, :x, randn(10,10))
 Future(2, 1, 4, nothing)
@@ -132,9 +132,3 @@ julia> gather_array(dataset) # download the data from workers to a sing
  0.610183  1.12165   0.722438
   ⋮
 ```
-
-## What does the name `DiDa` mean?
-
-**Di**stributed **Da**ta.
-
-There is no consensus on how to pronounce the shortcut.
