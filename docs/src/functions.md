@@ -3,27 +3,27 @@
 ## Data structures
 
 ```@autodocs
-Modules = [DiDa]
+Modules = [DistributedData]
 Pages = ["structs.jl"]
 ```
 
 ## Base functions
 
 ```@autodocs
-Modules = [DiDa]
+Modules = [DistributedData]
 Pages = ["base.jl"]
 ```
 
 ## Higher-level array operations
 
 ```@autodocs
-Modules = [DiDa]
+Modules = [DistributedData]
 Pages = ["tools.jl"]
 ```
 
 ## Input/Output
 
 ```@autodocs
-Modules = [DiDa]
+Modules = [DistributedData]
 Pages = ["io.jl"]
 ```

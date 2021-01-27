@@ -1,4 +1,4 @@
-name = "DiDa"
+name = "DistributedData"
 uuid = "f6a0035f-c5ac-4ad0-b410-ad102ced35df"
 authors = ["Mirek Kratochvil <exa.exa@gmail.com>"]
 version = "0.1.0"

@@ -1,8 +1,8 @@
 
 using Test
-using DiDa, Distributed, Random
+using DistributedData, Distributed, Random
 
-@testset "DiDa tests" begin
+@testset "DistributedData tests" begin
     include("base.jl")
     include("tools.jl")
 end
