@@ -2,7 +2,7 @@ using Documenter, DistributedData
 
 makedocs(modules = [DistributedData],
     clean = false,
-    format = Documenter.HTML(prettyurls = !("local" in ARGS)),
+    format = Documenter.HTML(prettyurls = !("local" in ARGS),
              canonical = "https://lcsb-biocore.github.io/DistributedData.jl/stable/",
              assets = ["assets/logo.ico"]),
     sitename = "DistributedData.jl",
