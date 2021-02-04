@@ -132,3 +132,13 @@ julia> gather_array(dataset) # download the data from workers to a sing
  0.610183  1.12165   0.722438
   ⋮
 ```
+
+## Using DistributedData.jl in HPC environments
+
+You can use
+[`ClusterManagers`](https://github.com/JuliaParallel/ClusterManagers.jl)
+package to add distributed workers from many different workload managers and
+task scheduling environments, such as Slurm, PBS, LSF, and others.
+
+See the documentation for an [example of using Slurm to run
+DistributedData](https://lcsb-biocore.github.io/DistributedData.jl/stable/slurm/).
