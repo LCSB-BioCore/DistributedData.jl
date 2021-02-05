@@ -63,11 +63,11 @@ Depending on the package, this may take a while, but should be done in under a
 minute for most existing packages. Finally, press `Ctrl+D` twice to exit both
 Julia and the interactive Slurm job shell.
 
-### Batch script
+### Slurm batch script
 
-An example Slurm batch script is here, save it as `run-analysis.batch` to your
-Slurm access node, in a directory that is shared with the workers (usually
-a subdirectory of `/scratch`):
+An example Slurm batch script is listed below -- save it as
+`run-analysis.batch` to your Slurm access node, in a directory that is shared
+with the workers (usually a "scratch" directory; try `cd $SCRATCH`).
 ```sh
 #!/bin/bash -l
 #SBATCH -n 128
@@ -81,9 +81,9 @@ module load lang/Julia/1.3.0
 julia run-analysis.jl
 ```
 
-The parameters are, in order:
-- using 128 "tasks" (ie. spawning 128 separate processes)
-- each process uses 1 CPU (you may want more CPUs if you work with actual
+The parameters in the script have this meaning, in order:
+- the batch spawns 128 "tasks" (ie. spawning 128 separate processes)
+- each task uses 1 CPU (you may want more CPUs if you work with actual
   threads and shared memory)
 - the whole batch takes maximum 60 minutes
 - each CPU (in our case each process) will be allocated 4 gigabytes of RAM
@@ -94,6 +94,7 @@ The parameters are, in order:
 - finally, it will run the Julia script `run-analysis.jl`
 
 ### Julia script
+
 The `run-analysis.jl` may look as follows:
 ```julia
 using  Distributed, ClusterManagers, DistributedData
@@ -122,6 +123,8 @@ Finally, you can execute the whole thing with `sbatch`:
 ```sh
 sbatch run-analysis.batch
 ```
+
+### Collecting the results
 
 After your tasks gets queued, executed and finished successfully, you may see
 the result in `result.txt`. In the meantime, you can entertain yourself by
@@ -153,8 +156,8 @@ job0017.out  job0036.out  job0055.out  job0074.out  job0093.out  job0112.out  sl
 job0018.out  job0037.out  job0056.out  job0075.out  job0094.out  job0113.out
 ```
 
-The files `jobXXXX.out` contain the information collected from individual
+The files `job*.out` contain the information collected from individual
 workers' standard outputs, such as the output of `println` or `@info`. For
-complicated programs, this is the easiest way to get out debugging information,
-and a simple but informative way to collect benchmarking output (using e.g.
-`@time`).
+complicated programs, this is the easiest way to get out the debugging
+information, and a simple but often sufficient way to collect benchmarking
+output (using e.g. `@time`).
