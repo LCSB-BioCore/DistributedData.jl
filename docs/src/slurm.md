@@ -31,9 +31,11 @@ similar as with many other distributed computing systems:
 
 ### Preparing the packages
 
-The easiest way to install the packages is using a single-machine interactive job. On the access node of your HPC, run:
+The easiest way to install the packages is using a single-machine interactive
+job. On the access node of your HPC, run this command to give you a 60-minute
+interactive session:
 ```sh
-srun --pty -n1 -c1 -t60 --mem 1G /bin/bash
+srun --pty -t60 /bin/bash -
 ```
 
 When the shell opens (the prompt should change), you can load the Julia module,
@@ -43,7 +45,7 @@ usually with a command such as this:
 module load lang/Julia/1.3.0
 ```
 
-(You may consult `module avail` for other possible Julia versions.)
+(You may consult `module spider julia` for other possible Julia versions.)
 
 After that, start `julia` and add press `]` to open the packaging prompt (you
 should see `(v1.3) pkg>` instead of `julia>`). There you can download and
@@ -65,14 +67,16 @@ Julia and the interactive Slurm job shell.
 
 ### Slurm batch script
 
-An example Slurm batch script is listed below -- save it as
-`run-analysis.batch` to your Slurm access node, in a directory that is shared
-with the workers (usually a "scratch" directory; try `cd $SCRATCH`).
+An example Slurm batch script
+([download](https://github.com/LCSB-BioCore/DistributedData.jl/blob/master/docs/slurm-example/run-analysis.batch))
+is listed below -- save it as `run-analysis.batch` to your Slurm access node,
+in a directory that is shared with the workers (usually a "scratch" directory;
+try `cd $SCRATCH`).
 ```sh
 #!/bin/bash -l
 #SBATCH -n 128
 #SBATCH -c 1
-#SBATCH -t 60
+#SBATCH -t 10
 #SBATCH --mem-per-cpu 4G
 #SBATCH -J MyDistributedJob
 
@@ -85,7 +89,7 @@ The parameters in the script have this meaning, in order:
 - the batch spawns 128 "tasks" (ie. spawning 128 separate processes)
 - each task uses 1 CPU (you may want more CPUs if you work with actual
   threads and shared memory)
-- the whole batch takes maximum 60 minutes
+- the whole batch takes maximum 10 minutes
 - each CPU (in our case each process) will be allocated 4 gigabytes of RAM
 - the job will be visible in the queue as `MyDistributedJob`
 - it will load Julia 1.3.0 module on the workers, so that `julia` executable is
@@ -95,12 +99,13 @@ The parameters in the script have this meaning, in order:
 
 ### Julia script
 
-The `run-analysis.jl` may look as follows:
+The `run-analysis.jl`
+([download](https://github.com/LCSB-BioCore/DistributedData.jl/blob/master/docs/slurm-example/run-analysis.jn))
+may look as follows:
 ```julia
 using  Distributed, ClusterManagers, DistributedData
 
 # read the number of available workers from  environment and start the worker processes
-
 n_workers = parse(Int , ENV["SLURM_NTASKS"])
 addprocs_slurm(n_workers , topology =:master_worker)
 
@@ -119,7 +124,8 @@ println(f, totalResult)
 close(f)
 ```
 
-Finally, you can execute the whole thing with `sbatch`:
+Finally, you can start the whole thing with `sbatch` command executed on the
+access node:
 ```sh
 sbatch run-analysis.batch
 ```
