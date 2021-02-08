@@ -38,6 +38,11 @@ interactive session:
 srun --pty -t60 /bin/bash -
 ```
 
+(Depending on your cluster setup, it may be benerifical to also specify a
+partition to which the job should belong to; many clusters provide an
+interactive partition where the interactive jobs get scheduled faster. To do
+that, add option `-p interactive` into the parameters of `srun`.)
+
 When the shell opens (the prompt should change), you can load the Julia module,
 usually with a command such as this:
 
