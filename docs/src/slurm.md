@@ -105,7 +105,7 @@ The parameters in the script have this meaning, in order:
 ### Julia script
 
 The `run-analysis.jl`
-([download](https://github.com/LCSB-BioCore/DistributedData.jl/blob/master/docs/slurm-example/run-analysis.jn))
+([download](https://github.com/LCSB-BioCore/DistributedData.jl/blob/master/docs/slurm-example/run-analysis.jl))
 may look as follows:
 ```julia
 using  Distributed, ClusterManagers, DistributedData
