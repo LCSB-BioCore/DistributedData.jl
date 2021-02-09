@@ -19,7 +19,7 @@ on worker-local storage (e.g. to prevent memory exhaustion) and others.
 To start quickly, you can read the tutorial:
 
 ```@contents
-Pages=["tutorial.md"]
+Pages=["tutorial.md", "slurm.md"]
 ```
 
 ### Functions
