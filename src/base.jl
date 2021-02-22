@@ -314,11 +314,8 @@ Call a function `fn` on `workers`, with a single parameter arriving from the
 corresponding position in `arr`.
 """
 function dmap(arr::Vector, fn, workers)
-    futures = [
-        remotecall(() -> Base.eval(Main, :($fn($(arr[i])))), pid) #TODO convert to get_from
-        for (i, pid) in enumerate(workers)
-    ]
-    return [fetch(f) for f in futures]
+    fetch.([get_from(w, :($fn($(arr[i]))))
+            for (i, w) in enumerate(workers)])
 end
 
 """
