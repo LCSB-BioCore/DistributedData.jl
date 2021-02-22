@@ -319,7 +319,7 @@ function dmap(arr::Vector, fn, workers)
 end
 
 """
-    dpmap(fn, args...; kwargs...)
+    dpmap(fn, args...; mod = Main, kwargs...)
 
 "Distributed pool map."
 
@@ -341,8 +341,8 @@ di = distributeSomeData()
 dpmap(x -> :(computeSomething(\$(di.val), \$x)), CachingPool(di.workers), Vector(1:10))
 ```
 """
-function dpmap(fn, args...; kwargs...)
-    return pmap(x -> Base.eval(Main,fn(x)), args...; kwargs...)
+function dpmap(fn, args...; mod = Main, kwargs...)
+    return pmap(x -> Base.eval(mod, fn(x)), args...; kwargs...)
 end
 
 """
