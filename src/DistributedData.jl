@@ -17,6 +17,7 @@ export save_at,
     dtransform,
     dmapreduce,
     dmap,
+    dpmap,
     gather_array,
     tmp_symbol
 
