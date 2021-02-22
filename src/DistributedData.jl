@@ -22,9 +22,7 @@ export save_at,
     tmp_symbol
 
 include("io.jl")
-export dstore,
-    dload,
-    dunlink
+export dstore, dload, dunlink
 
 include("tools.jl")
 export dcopy,

@@ -33,10 +33,7 @@ end
 
 Overloaded functionality for `Dinfo`.
 """
-function dstore(
-    dInfo::Dinfo,
-    files = defaultFiles(dInfo.val, dInfo.workers),
-)
+function dstore(dInfo::Dinfo, files = defaultFiles(dInfo.val, dInfo.workers))
     dstore(dInfo.val, dInfo.workers, files)
 end
 
@@ -47,16 +44,12 @@ Import the content of symbol `sym` by each worker specified by `pids` from the
 corresponding filename in `files`.
 """
 function dload(sym::Symbol, pids, files = defaultFiles(sym, pids))
-    dmap(
-        files,
-        (fn) -> Base.eval(Main, :(
-            begin
-                $sym = open($deserialize, $fn)
-                nothing
-            end
-        )),
-        pids,
-    )
+    dmap(files, (fn) -> Base.eval(Main, :(
+        begin
+            $sym = open($deserialize, $fn)
+            nothing
+        end
+    )), pids)
     return Dinfo(sym, pids)
 end
 
@@ -65,10 +58,7 @@ end
 
 Overloaded functionality for `Dinfo`.
 """
-function dload(
-    dInfo::Dinfo,
-    files = defaultFiles(dInfo.val, dInfo.workers),
-)
+function dload(dInfo::Dinfo, files = defaultFiles(dInfo.val, dInfo.workers))
     dload(dInfo.val, dInfo.workers, files)
 end
 
@@ -87,9 +77,6 @@ end
 
 Overloaded functionality for `Dinfo`.
 """
-function dunlink(
-    dInfo::Dinfo,
-    files = defaultFiles(dInfo.val, dInfo.workers),
-)
+function dunlink(dInfo::Dinfo, files = defaultFiles(dInfo.val, dInfo.workers))
     dunlink(dInfo.val, dInfo.workers, files)
 end
