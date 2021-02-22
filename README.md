@@ -7,10 +7,21 @@
 
 Simple distributed data manipulation and processing routines for Julia.
 
+
+#### Acknowledgements
+
 This was originally developed for
 [`GigaSOM.jl`](https://github.com/LCSB-BioCore/GigaSOM.jl); DistributedData.jl package
 contains the separated-out lightweight distributed-processing framework that
 was used in `GigaSOM.jl`.
+
+`DistributedData.jl` was developed in
+Luxembourg Centre for Systems Biomedicine of the University of Luxembourg ([lcsb.uni.lu](https://lcsb.uni.lu/)).
+The development was supported by
+European Union ELIXIR Staff Exchange programme 2020 ([elixir-europe.org](https://elixir-europe.org/)), and
+European Union's Horizon 2020 Programme under PerMedCoE project ([permedcoe.eu](https://www.permedcoe.eu/)) agreement no. 951773.
+
+<img src="docs/src/assets/lcsb.svg" alt="LCSB logo" height="64px">   <img src="docs/src/assets/elixir.svg" alt="ELIXIR logo" height="64px">   <img src="docs/src/assets/permedcoe.svg" alt="PerMedCoE logo" height="64px">
 
 ## Why?
 
