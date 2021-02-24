@@ -15,7 +15,7 @@ This was originally developed for
 `DistributedData.jl` package contains the separated-out lightweight
 distributed-processing framework that was used in `GigaSOM.jl`.
 
-`DistributedData.jl` was developed in
+`DistributedData.jl` was developed at the
 Luxembourg Centre for Systems Biomedicine of the University of Luxembourg ([uni.lu/lcsb](https://www.uni.lu/lcsb)).
 The development was supported by
 European Union ELIXIR Staff Exchange programme 2020 ([elixir-europe.org](https://elixir-europe.org/)), and
