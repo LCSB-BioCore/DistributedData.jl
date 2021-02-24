@@ -17,13 +17,12 @@ export save_at,
     dtransform,
     dmapreduce,
     dmap,
+    dpmap,
     gather_array,
     tmp_symbol
 
 include("io.jl")
-export dstore,
-    dload,
-    dunlink
+export dstore, dload, dunlink
 
 include("tools.jl")
 export dcopy,

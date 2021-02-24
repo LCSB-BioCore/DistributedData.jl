@@ -13,11 +13,7 @@ end
 
 Reduce dataset to selected columns, optionally save it under a different name.
 """
-function dselect(
-    dInfo::Dinfo,
-    columns::Vector{Int},
-    tgt::Symbol = dInfo.val,
-)::Dinfo
+function dselect(dInfo::Dinfo, columns::Vector{Int}, tgt::Symbol = dInfo.val)::Dinfo
     dtransform(dInfo, mtx -> mtx[:, columns], tgt)
 end
 
@@ -91,10 +87,7 @@ end
 Compute mean and standard deviation of the columns in dataset. Returns a tuple
 with a vector of means in `columns`, and a vector of corresponding sdevs.
 """
-function dstat(
-    dInfo::Dinfo,
-    columns::Vector{Int},
-)::Tuple{Vector{Float64},Vector{Float64}}
+function dstat(dInfo::Dinfo, columns::Vector{Int})::Tuple{Vector{Float64},Vector{Float64}}
 
     sum_squares = x -> sum(x .^ 2)
 
@@ -136,8 +129,7 @@ function dstat_buckets(
         )
 
     # extract the bucketed stats
-    (sums, sqsums, ns) =
-        dmapreduce([dInfo, buckets], get_bucketed_stats, combine_stats)
+    (sums, sqsums, ns) = dmapreduce([dInfo, buckets], get_bucketed_stats, combine_stats)
 
     return (
         sums ./ ns, #means
@@ -285,7 +277,8 @@ less or higher than `targets`.
 """
 function update_extrema(counts, targets, lims, mids)
     broadcast(
-        (cnt, target, lim, mid) -> cnt >= target ? # if the count is too high,
+        (cnt, target, lim, mid) ->
+            cnt >= target ? # if the count is too high,
             (lim[1], mid) : # median is going to be in the lower half
             (mid, lim[2]),  # otherwise in the higher half
         counts,
@@ -313,11 +306,8 @@ function dmedian(dInfo::Dinfo, columns::Vector{Int}; iters = 20)
     target = dmapreduce(dInfo, d -> size(d, 1), +) ./ 2
 
     # current estimation range for the median (tuples of min, max)
-    lims = dmapreduce(
-        dInfo,
-        d -> mapslices(extrema, d[:, columns], dims = 1),
-        reduce_extrema,
-    )
+    lims =
+        dmapreduce(dInfo, d -> mapslices(extrema, d[:, columns], dims = 1), reduce_extrema)
 
     # convert the limits to a simple vector
     lims = cat(lims..., dims = 1)
@@ -368,8 +358,8 @@ function dmedian_buckets(
     get_bucket_extrema =
         (d, b) -> catmapbuckets(
             (_, x) -> length(x) > 0 ? # if there are some elements
-                    extrema(x) : # just take the extrema
-                    (Inf, -Inf), # if not, use backup values
+                extrema(x) : # just take the extrema
+                (Inf, -Inf), # if not, use backup values
             d[:, columns],
             nbuckets,
             b,
@@ -384,21 +374,22 @@ function dmedian_buckets(
         # this counts the elements smaller than mids in buckets
         # (both mids and elements are bucketed and column-sliced into matrices)
         bucketed_count_smaller_than_mids =
-            (d, b) -> vcat(mapbuckets(
-                (bucketID, d) ->
-                    [
-                        count(x -> x < mids[bucketID, colID], d[:, colID])
-                        for (colID, c) in enumerate(columns)
-                    ]',
-                d,
-                nbuckets,
-                b,
-                slicedims = (1, 2),
-            )...)
+            (d, b) -> vcat(
+                mapbuckets(
+                    (bucketID, d) ->
+                        [
+                            count(x -> x < mids[bucketID, colID], d[:, colID]) for
+                            (colID, c) in enumerate(columns)
+                        ]',
+                    d,
+                    nbuckets,
+                    b,
+                    slicedims = (1, 2),
+                )...,
+            )
 
         # gather the counts
-        counts =
-            dmapreduce([dInfo, buckets], bucketed_count_smaller_than_mids, +)
+        counts = dmapreduce([dInfo, buckets], bucketed_count_smaller_than_mids, +)
 
         lims = update_extrema(counts, targets, lims, mids)
     end

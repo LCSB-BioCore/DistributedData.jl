@@ -30,7 +30,7 @@ The symbols are saved in Main module on the corresponding worker. For example,
 `save_at(1, :x, nothing)` _will_ erase your local `x` variable. Beware of name
 collisions.
 """
-function save_at(worker, sym::Symbol, val; mod=Main)
+function save_at(worker, sym::Symbol, val; mod = Main)
     remotecall(() -> Base.eval(mod, :(
         begin
             $sym = $val
@@ -45,7 +45,7 @@ end
 Get a value `val` from a remote `worker`; quoting of `val` works just as with
 `save_at`. Returns a future with the requested value.
 """
-function get_from(worker, val; mod=Main)
+function get_from(worker, val; mod = Main)
     remotecall(() -> Base.eval(mod, :($val)), worker)
 end
 
@@ -162,11 +162,7 @@ end
 
 Same as `dtransform`, but specialized for `Dinfo`.
 """
-function dtransform(
-    dInfo::Dinfo,
-    fn,
-    tgt::Symbol = dInfo.val,
-)::Dinfo
+function dtransform(dInfo::Dinfo, fn, tgt::Symbol = dInfo.val)::Dinfo
     dtransform(dInfo.val, fn, dInfo.workers, tgt)
 end
 
@@ -314,11 +310,34 @@ Call a function `fn` on `workers`, with a single parameter arriving from the
 corresponding position in `arr`.
 """
 function dmap(arr::Vector, fn, workers)
-    futures = [
-        remotecall(() -> Base.eval(Main, :($fn($(arr[i])))), pid) #TODO convert to get_from
-        for (i, pid) in enumerate(workers)
-    ]
-    return [fetch(f) for f in futures]
+    fetch.([get_from(w, :($fn($(arr[i])))) for (i, w) in enumerate(workers)])
+end
+
+"""
+    dpmap(fn, args...; mod = Main, kwargs...)
+
+"Distributed pool map."
+
+A wrapper for `pmap` from `Distributed` package that executes the code in the
+correct module, so that it can access the distributed variables at remote
+workers. All arguments other than the first function `fn` are passed to `pmap`.
+
+The function `fn` should return an expression that is going to get evaluated.
+
+# Example
+
+```julia
+using Distributed
+dpmap(x -> :(computeSomething(someData, \$x)), WorkerPool(workers), Vector(1:10))
+```
+
+```julia
+di = distributeSomeData()
+dpmap(x -> :(computeSomething(\$(di.val), \$x)), CachingPool(di.workers), Vector(1:10))
+```
+"""
+function dpmap(fn, args...; mod = Main, kwargs...)
+    return pmap(x -> Base.eval(mod, fn(x)), args...; kwargs...)
 end
 
 """
