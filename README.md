@@ -7,15 +7,26 @@
 
 Simple distributed data manipulation and processing routines for Julia.
 
+
+#### Acknowledgements
+
 This was originally developed for
-[`GigaSOM.jl`](https://github.com/LCSB-BioCore/GigaSOM.jl); DistributedData.jl package
-contains the separated-out lightweight distributed-processing framework that
-was used in `GigaSOM.jl`.
+[`GigaSOM.jl`](https://github.com/LCSB-BioCore/GigaSOM.jl);
+`DistributedData.jl` package contains the separated-out lightweight
+distributed-processing framework that was used in `GigaSOM.jl`.
+
+`DistributedData.jl` was developed at the
+Luxembourg Centre for Systems Biomedicine of the University of Luxembourg ([uni.lu/lcsb](https://www.uni.lu/lcsb)).
+The development was supported by
+European Union ELIXIR Staff Exchange programme 2020 ([elixir-europe.org](https://elixir-europe.org/)), and
+European Union's Horizon 2020 Programme under PerMedCoE project ([permedcoe.eu](https://www.permedcoe.eu/)) agreement no. 951773.
+
+<img src="docs/src/assets/unilu.svg" alt="Uni.lu logo" height="64px">   <img src="docs/src/assets/lcsb.svg" alt="LCSB logo" height="64px">   <img src="docs/src/assets/elixir.svg" alt="ELIXIR logo" height="64px">   <img src="docs/src/assets/permedcoe.svg" alt="PerMedCoE logo" height="64px">
 
 ## Why?
 
-DistributedData.jl provides a very simple, imperative and straightforward way to move your
-data around a cluster of Julia processes created by the
+`DistributedData.jl` provides a very simple, imperative and straightforward way
+to move your data around a cluster of Julia processes created by the
 [`Distributed`](https://docs.julialang.org/en/v1/stdlib/Distributed/) package,
 and run computation on the distributed data pieces. The main aim of the package
 is to avoid anything complicated-- the first version used in
@@ -133,7 +144,7 @@ julia> gather_array(dataset) # download the data from workers to a sing
   ⋮
 ```
 
-## Using DistributedData.jl in HPC environments
+## Using `DistributedData.jl` in HPC environments
 
 You can use
 [`ClusterManagers`](https://github.com/JuliaParallel/ClusterManagers.jl)
