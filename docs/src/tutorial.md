@@ -153,8 +153,8 @@ run asynchronously, they are processed concurrently, thus faster.
 To illustrate the difference, the following code distributes some random data
 and then synchronizes correctly, but is essentially serial:
 ```julia
-julia> @time for i in workers()
-         fetch(save_at(i, :x, :(randn(10000,10000))))
+julia> @time for w in workers()
+         fetch(save_at(w, :x, :(randn(10000,10000))))
        end
   1.073267 seconds (346 allocations: 12.391 KiB)
 ```
@@ -164,7 +164,8 @@ make the code parallel, and usually a few times faster (depending on the number
 of workers):
 
 ```julia
-julia> @time fetch.([save_at(i, :x, :(randn(10000,10000))) for i in workers()])
+julia> @time map(fetch, [save_at(w, :x, :(randn(10000,10000)))
+                         for w in workers()])
   0.403235 seconds (44.50 k allocations: 2.277 MiB)
 3-element Array{Nothing,1}:
 nothing
@@ -175,8 +176,8 @@ The same is applicable for retrieving the sub-results in parallel. This example
 demonstrates that multiple workers can do some work at the same time:
 
 ```julia
-julia> @time fetch.([get_from(i, :(begin sleep(1); myid(); end))
-                     for i in workers()])
+julia> @time map(fetch, [get_from(i, :(begin sleep(1); myid(); end))
+                         for i in workers()])
   1.027651 seconds (42.26 k allocations: 2.160 MiB)
 3-element Array{Int64,1}:
  2
@@ -211,7 +212,8 @@ of individual workers. The storage of the variables is otherwise same as with
 the basic data-moving function -- you can e.g. manually check the size of the
 resulting slices on each worker using `get_from`:
 ```julia
-julia> fetch.([get_from(w, :(size($(dataset.val)))) for w in dataset.workers])
+julia> map(fetch, [get_from(w, :(size($(dataset.val))))
+                   for w in dataset.workers])
 3-element Array{Tuple{Int64,Int64},1}:
  (333, 3)
  (333, 3)
