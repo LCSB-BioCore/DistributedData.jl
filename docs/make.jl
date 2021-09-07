@@ -1,10 +1,13 @@
 using Documenter, DistributedData
 
-makedocs(modules = [DistributedData],
+makedocs(
+    modules = [DistributedData],
     clean = false,
-    format = Documenter.HTML(prettyurls = !("local" in ARGS),
-             canonical = "https://lcsb-biocore.github.io/DistributedData.jl/stable/",
-             assets = ["assets/logo.ico"]),
+    format = Documenter.HTML(
+        prettyurls = !("local" in ARGS),
+        canonical = "https://lcsb-biocore.github.io/DistributedData.jl/stable/",
+        assets = ["assets/logo.ico"],
+    ),
     sitename = "DistributedData.jl",
     authors = "The developers of DistributedData.jl",
     linkcheck = !("skiplinks" in ARGS),
@@ -20,5 +23,5 @@ deploydocs(
     target = "build",
     branch = "gh-pages",
     devbranch = "develop",
-    push_preview = true
+    push_preview = true,
 )
