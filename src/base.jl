@@ -311,7 +311,7 @@ Call a function `fn` on `workers`, with a single parameter arriving from the
 corresponding position in `arr`.
 """
 function dmap(arr::Vector, fn, workers)
-    fetch.([get_from(w, :($fn($(arr[i])))) for (i, w) in enumerate(workers)])
+    map(fetch, [get_from(w, :($fn($(arr[i])))) for (i, w) in enumerate(workers)])
 end
 
 """

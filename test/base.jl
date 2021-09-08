@@ -86,14 +86,14 @@
     end
 
     @testset "`pmap` on distributed data" begin
-        fetch.(save_at.(W, :test, 1234321))
+        map(fetch, save_at.(W, :test, 1234321))
         di = Dinfo(:test, W) # also test the example in docs
         @test dpmap(
             x -> :($(di.val) + $x),
             WorkerPool(di.workers),
             [4321234, 1234, 4321],
         ) == [5555555, 1235555, 1238642]
-        fetch.(remove_from.(W, :test))
+        map(fetch, remove_from.(W, :test))
     end
 
     @testset "Internal utilities" begin
