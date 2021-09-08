@@ -129,6 +129,16 @@
         @test all([!isfile(f) for f in files])
     end
 
+    @testset "@remote macro" begin
+        di = dtransform(:(), _ -> myid(), W, :test)
+
+        test = 333
+
+        for pid in W
+            @test remotecall_fetch(() -> test + (@remote test), pid) == test + pid
+        end
+    end
+
     rmprocs(W)
     W = nothing
 

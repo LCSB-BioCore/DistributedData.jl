@@ -19,7 +19,8 @@ export save_at,
     dmap,
     dpmap,
     gather_array,
-    tmp_symbol
+    tmp_symbol,
+    @remote
 
 include("io.jl")
 export dstore, dload, dunlink
