@@ -166,7 +166,7 @@ function dtransform(dInfo::Dinfo, fn, tgt::Symbol = dInfo.val)::Dinfo
 end
 
 """
-    dmapreduce(val, map, fold, workers)
+    dmapreduce(val, map, fold, workers; prefetch = :all)
 
 A distributed work-alike of the standard `mapreduce`: Take a function `map` (a
 non-modifying transform on the data) and `fold` (2-to-1 reduction of the
@@ -177,8 +177,10 @@ It is assumed that the fold operation is associative, but not commutative (as
 in semigroups). If there are no workers, operation returns `nothing` (we don't
 have a monoid to magically conjure zero elements :[ ).
 
-In current version, the reduce step is a sequential left fold, executed in the
-main process.
+In the current version, the reduce step is a sequential left fold, executed in
+the main process. Parameter `prefetch` says how many futures should be
+`fetch`ed in advance; increasing prefetch improves the throughput but increases
+memory usage in case the results of `map` are big.
 
 # Example
     # compute the mean of all distributed data
@@ -199,22 +201,39 @@ example, distributed values `:a` and `:b` can be joined as such:
         vcat,
         workers())
 """
-function dmapreduce(val, map, fold, workers)
-    if isempty(workers)
-        return nothing
+function dmapreduce(val, map, fold, workers; prefetch = :all)
+    if prefetch == :all
+        prefetch = length(workers)
     end
 
-    futures = [get_from(pid, :($map($val))) for pid in workers]
-    res = fetch(futures[1])
+    futures = asyncmap(workers) do pid
+        get_from(pid, :($map($val)))
+    end
 
-    # replace the collected futures with new empty futures to allow them to be
-    # GC'd and free memory for more incoming results
-    futures[1] = Future()
+    res = nothing
+    prefetched = 0
 
-    for i = 2:length(futures)
-        res = fold(res, fetch(futures[i]))
+    @sync for i in eachindex(futures)
+        # start fetching a few futures in advance
+        while prefetched < min(i + prefetch, length(futures))
+            prefetched += 1
+            # dodge deadlock
+            if workers[prefetched] != myid()
+                @async fetch(futures[$prefetched])
+            end
+        end
+
+        if i == 1
+            # nothing to fold yet
+            res = fetch(futures[i])
+        else
+            res = fold(res, fetch(futures[i]))
+        end
+        # replace the collected future with an empty structure so that the data
+        # can be GC'd, freeing memory for more incoming results
         futures[i] = Future()
     end
+
     res
 end
 

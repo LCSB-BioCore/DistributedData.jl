@@ -63,6 +63,16 @@
             sum(orig .^ 2),
         )
 
+        @test isapprox(
+            dmapreduce(:test, d -> sum(d .^ 2), (a, b) -> a + b, W),
+            dmapreduce(:test, d -> sum(d .^ 2), (a, b) -> a + b, W; prefetch = 0),
+        )
+
+        @test isapprox(
+            dmapreduce(:test, d -> sum(d .^ 2), (a, b) -> a + b, W),
+            dmapreduce(:test, d -> sum(d .^ 2), (a, b) -> a + b, W; prefetch = 2),
+        )
+
         dtransform(di, d -> d .* 2)
 
         @test orig .* 2 == gather_array(:test, W)
