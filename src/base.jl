@@ -69,28 +69,25 @@ function remove_from(worker, sym::Symbol)
 end
 
 """
-    scatter_array(sym, x::Array, pids; dim=1)::Dinfo
+    scatter_array(sym, x::Array, workers; dim=1)::Dinfo
 
 Distribute roughly equal parts of array `x` separated on dimension `dim` among
-`pids` into a worker-local variable `sym`.
+`workers` into a worker-local variable `sym`.
 
 Returns the `Dinfo` structure for the distributed data.
 """
-function scatter_array(sym::Symbol, x::Array, pids; dim = 1)::Dinfo
-    n = length(pids)
+function scatter_array(sym::Symbol, x::Array, workers; dim = 1)::Dinfo
+    n = length(workers)
     dims = size(x)
 
-    for f in [
-        begin
-            extent = [(1:s) for s in dims]
-            extent[dim] = (1+div((wid - 1) * dims[dim], n)):div(wid * dims[dim], n)
-            save_at(pid, sym, x[extent...])
-        end for (wid, pid) in enumerate(pids)
-    ]
-        fetch(f)
+    asyncmap(enumerate(workers)) do (i, pid)
+        extent = [(1:s) for s in dims]
+        extent[dim] = (1+div((i - 1) * dims[dim], n)):div(i * dims[dim], n)
+        wait(save_at(pid, sym, x[extent...]))
+        nothing
     end
 
-    return Dinfo(sym, pids)
+    return Dinfo(sym, workers)
 end
 
 """
@@ -99,8 +96,8 @@ end
 Remove the loaded data from workers.
 """
 function unscatter(sym::Symbol, workers)
-    for f in [remove_from(pid, sym) for pid in workers]
-        fetch(f)
+    asyncmap(workers) do pid
+        wait(remove_from(pid, sym))
     end
 end
 
@@ -121,14 +118,15 @@ collected. This is optimal for various side-effect-causing computations that
 are not easily expressible with `dtransform`.
 """
 function dexec(val, fn, workers)
-    for f in [get_from(pid, :(
-        begin
-            $fn($val)
-            nothing
-        end
-    )) for pid in workers]
-        fetch(f)
+    asyncmap(workers) do pid
+        wait(get_from(pid, :(
+            begin
+                $fn($val)
+                nothing
+            end
+        )))
     end
+    nothing
 end
 
 """
@@ -152,8 +150,8 @@ in-place, by a function `fn`. Store the result as `tgt` (default `val`)
     dtransform(:myData, (d)->(2*d), workers())
 """
 function dtransform(val, fn, workers, tgt::Symbol = val)::Dinfo
-    for f in [save_at(pid, tgt, :($fn($val))) for pid in workers]
-        fetch(f)
+    asyncmap(workers) do pid
+        wait(save_at(pid, tgt, :($fn($val))))
     end
     return Dinfo(tgt, workers)
 end
@@ -168,7 +166,7 @@ function dtransform(dInfo::Dinfo, fn, tgt::Symbol = dInfo.val)::Dinfo
 end
 
 """
-    dmapreduce(val, map, fold, workers)
+    dmapreduce(val, map, fold, workers; prefetch = :all)
 
 A distributed work-alike of the standard `mapreduce`: Take a function `map` (a
 non-modifying transform on the data) and `fold` (2-to-1 reduction of the
@@ -179,8 +177,10 @@ It is assumed that the fold operation is associative, but not commutative (as
 in semigroups). If there are no workers, operation returns `nothing` (we don't
 have a monoid to magically conjure zero elements :[ ).
 
-In current version, the reduce step is a sequential left fold, executed in the
-main process.
+In the current version, the reduce step is a sequential left fold, executed in
+the main process. Parameter `prefetch` says how many futures should be
+`fetch`ed in advance; increasing prefetch improves the throughput but increases
+memory usage in case the results of `map` are big.
 
 # Example
     # compute the mean of all distributed data
@@ -201,22 +201,39 @@ example, distributed values `:a` and `:b` can be joined as such:
         vcat,
         workers())
 """
-function dmapreduce(val, map, fold, workers)
-    if isempty(workers)
-        return nothing
+function dmapreduce(val, map, fold, workers; prefetch = :all)
+    if prefetch == :all
+        prefetch = length(workers)
     end
 
-    futures = [get_from(pid, :($map($val))) for pid in workers]
-    res = fetch(futures[1])
+    futures = asyncmap(workers) do pid
+        get_from(pid, :($map($val)))
+    end
 
-    # replace the collected futures with new empty futures to allow them to be
-    # GC'd and free memory for more incoming results
-    futures[1] = Future()
+    res = nothing
+    prefetched = 0
 
-    for i = 2:length(futures)
-        res = fold(res, fetch(futures[i]))
+    @sync for i in eachindex(futures)
+        # start fetching a few futures in advance
+        while prefetched < min(i + prefetch, length(futures))
+            prefetched += 1
+            # dodge deadlock
+            if workers[prefetched] != myid()
+                @async fetch(futures[$prefetched])
+            end
+        end
+
+        if i == 1
+            # nothing to fold yet
+            res = fetch(futures[i])
+        else
+            res = fold(res, fetch(futures[i]))
+        end
+        # replace the collected future with an empty structure so that the data
+        # can be GC'd, freeing memory for more incoming results
         futures[i] = Future()
     end
+
     res
 end
 
@@ -275,18 +292,16 @@ This preallocates the array for results, and is thus more efficient than e.g.
 using `dmapreduce` with `vcat` for folding.
 """
 function gather_array(val::Symbol, workers, dim = 1; free = false)
-    size0 = get_val_from(workers[1], :(size($val)))
-    innerType = get_val_from(workers[1], :(typeof($val).parameters[1]))
+    (size0, innerType) = get_val_from(workers[1], :((size($val), eltype($val))))
     sizes = dmapreduce(val, d -> size(d, dim), vcat, workers)
     ressize = [size0[i] for i = 1:length(size0)]
     ressize[dim] = sum(sizes)
+    offs = [0; cumsum(sizes)]
     result = zeros(innerType, ressize...)
-    off = 0
-    for (i, pid) in enumerate(workers)
+    asyncmap(enumerate(workers)) do (i, pid)
         idx = [(1:ressize[j]) for j = 1:length(ressize)]
-        idx[dim] = ((off+1):(off+sizes[i]))
+        idx[dim] = (offs[i]+1):(offs[i+1])
         result[idx...] = get_val_from(pid, val)
-        off += sizes[i]
     end
     if free
         unscatter(val, workers)
@@ -311,7 +326,9 @@ Call a function `fn` on `workers`, with a single parameter arriving from the
 corresponding position in `arr`.
 """
 function dmap(arr::Vector, fn, workers)
-    map(fetch, [get_from(w, :($fn($(arr[i])))) for (i, w) in enumerate(workers)])
+    asyncmap(enumerate(workers)) do (i, w)
+        get_val_from(w, :($fn($(arr[i]))))
+    end
 end
 
 """
